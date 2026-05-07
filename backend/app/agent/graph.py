@@ -47,10 +47,9 @@ from langgraph.graph import END, START, StateGraph
 
 from app.agent.llm import make_streaming_llm
 from app.agent.memory import get_memory
-from app.agent.models import HALToolCall, Intent, Plan, ToolResult
+from app.agent.models import HALToolCall, Plan, ToolResult
 from app.agent.prompts import RESPONSE_GENERATION_PROMPT, build_system_prompt
 from app.agent.tools import (
-    classify_intent,
     execute_tool,
     extract_tool_args,
     make_plan,
@@ -81,7 +80,6 @@ class HALState(TypedDict, total=False):
     user_id: str
     session_id: str
 
-    intent: Intent | None
     memory_context: str
 
     plan: Plan | None
@@ -98,12 +96,6 @@ class HALState(TypedDict, total=False):
 
 
 # ── Nodes ────────────────────────────────────────────────────────────────────
-
-
-async def node_intent_classifier(state: HALState) -> dict[str, Any]:
-    intent = await classify_intent(state["user_message"], history=state.get("history"))
-    log.info("intent → %s | %s", intent.kind, intent.rationale[:80])
-    return {"intent": intent}
 
 
 async def node_memory_retrieval(state: HALState) -> dict[str, Any]:
@@ -329,15 +321,10 @@ async def node_response_seed(state: HALState) -> dict[str, Any]:
 # ── Routing ──────────────────────────────────────────────────────────────────
 
 
-def route_after_intent(state: HALState) -> Literal["planner", "response_seed"]:
-    intent = state.get("intent")
-    return "planner" if (intent and intent.kind == "tool") else "response_seed"
-
-
 def route_after_planner(state: HALState) -> Literal["tool_executor", "response_seed"]:
-    """If the planner produced an empty plan (e.g. it decided no tool was
-    actually needed despite the intent classifier's vote), skip straight to
-    response generation — there's nothing to execute."""
+    """The planner is the single is-this-a-tool-turn decision: empty
+    `plan.steps` means conversation, jump straight to response generation;
+    non-empty means the tool executor takes over."""
     plan = state.get("plan")
     if plan and plan.steps:
         return "tool_executor"
@@ -362,8 +349,17 @@ def route_after_tool(state: HALState) -> Literal["tool_executor", "self_correcti
 
 
 def build_graph():
+    """Pipeline:
+
+        START → memory_retrieval → planner ─┬→ tool_executor (loop) → memory_write → response_seed → END
+                                            └→ response_seed (no tools needed) → END
+
+    The planner is the single is-this-a-tool-turn decision; we used to run
+    a separate `intent_classifier` LLM call before it but its only job was
+    to gate the planner, and the planner already returns `steps=[]` for
+    pure-conversation turns.  Dropping the classifier saves one LLM call
+    per turn (≈25 % latency on hybrid-MoE backends like ik_llama)."""
     g = StateGraph(HALState)
-    g.add_node("intent_classifier", node_intent_classifier)
     g.add_node("memory_retrieval",  node_memory_retrieval)
     g.add_node("planner",           node_planner)
     g.add_node("tool_executor",     node_tool_executor)
@@ -371,9 +367,8 @@ def build_graph():
     g.add_node("memory_write",      node_memory_write)
     g.add_node("response_seed",     node_response_seed)
 
-    g.add_edge(START, "intent_classifier")
-    g.add_edge("intent_classifier", "memory_retrieval")
-    g.add_conditional_edges("memory_retrieval", route_after_intent)
+    g.add_edge(START, "memory_retrieval")
+    g.add_edge("memory_retrieval", "planner")
     g.add_conditional_edges("planner", route_after_planner)
     g.add_conditional_edges("tool_executor", route_after_tool)
     g.add_edge("self_correction", "tool_executor")
