@@ -65,6 +65,13 @@ PARALLEL="${PARALLEL:-1}"   # parallel slots (HAL uses 1; bump if you serve > 1 
 MOE_CPU="${MOE_CPU:-1}"
 MOE_CPU_FROM="${MOE_CPU_FROM:-14}"
 
+# Qwen3 (and other "thinking" models) emit a <think>…</think> block before
+# every reply.  Useful for one-shot reasoning, but *deadly* for HAL:
+# each turn issues 4 LLM calls (classify → plan → extract args → respond)
+# and 200-300 thinking tokens per call adds ~30-40 s of latency.  Disable
+# globally by default; set THINKING=1 to opt back in.
+THINKING="${THINKING:-0}"
+
 echo "=== ik_llama.cpp llama-server ==="
 echo "  binary  : $SERVER_BIN"
 echo "  model   : $MODEL"
@@ -83,6 +90,11 @@ ARGS=(
     --parallel "$PARALLEL"
     --jinja
 )
+
+if [[ "$THINKING" != "1" ]]; then
+    echo "  thinking: OFF  (Qwen3 reasoning <think>…</think> disabled in chat template)"
+    ARGS+=(--chat-template-kwargs '{"enable_thinking":false}')
+fi
 
 if [[ "$MOE_CPU" == "1" ]]; then
     if [[ "$MOE_CPU_FROM" -le 0 ]]; then
