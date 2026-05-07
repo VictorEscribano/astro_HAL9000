@@ -1,0 +1,80 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans+Condensed:wght@300;400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg:          #050507;
+  --panel:       #0B0D10;
+  --text:        #E6EAF0;
+  --dim:         #5A6070;
+  --accent-blue: #3BA7FF;
+  /* RGB triple consumed by the accent-red Tailwind token (with alpha channel
+     modifiers like accent-red/20).  StatusBar overrides this based on the
+     user's themeAccent setting. */
+  --accent-red-rgb: 255 59 59;
+  --accent-red: rgb(var(--accent-red-rgb));
+  --border:      rgba(255,255,255,0.06);
+  /* Global font scale — StatusBar overrides this from the user's setting
+     (xs/sm/md/lg). All component text-[Npx] classes use calc(N*var(--fs)). */
+  --fs: 1;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Inter Tight', 'IBM Plex Sans Condensed', system-ui, sans-serif;
+  overflow: hidden;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Monospace elements */
+code, pre, .font-mono {
+  font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace;
+}
+
+/* Leaflet dark override */
+.leaflet-container {
+  background: #050507 !important;
+  font-family: 'IBM Plex Mono', monospace !important;
+}
+.leaflet-control-zoom a {
+  background: #0B0D10 !important;
+  color: #3BA7FF !important;
+  border-color: rgba(255,255,255,0.1) !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(59,167,255,0.4); }
+
+/* Tool card animation */
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.tool-card-enter { animation: slideIn 0.15s ease-out; }
+
+/* Scanline overlay (optional, activated by class) */
+.scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.04) 2px,
+    rgba(0,0,0,0.04) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* FUI glow utilities */
+.glow-blue  { text-shadow: 0 0 8px rgba(59,167,255,0.6); }
+.glow-red   { text-shadow: 0 0 8px rgba(255,59,59,0.6); }

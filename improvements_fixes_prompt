@@ -1,0 +1,161 @@
+La IA no tiene contexto temporal del chat, no recuerda mensajes anteriores.  
+¿Veré el satélite Mohammed VI desde mi ubicación hoy sí o no? Justifícalo.
+
+---
+
+El satélite con el identificador NORAD 43001, que corresponde al satélite BEIDOU-3 M1 (no a Mohammed VI), tiene una pasada visible desde tu ubicación en Sabadell hoy, 5 de mayo de 2026. La información detallada es la siguiente:
+
+- **Inicio de la pasada**: 16:33:05 UTC  
+- **Fin de la pasada**: 00:55:45 UTC del día siguiente (6 de mayo)  
+- **Altitud máxima**: 75.71°
+
+Dado que el máximo ángulo de elevación es de 75.71°, que supera los 20° requeridos para una pasada visible, puedes observar esta pasada del satélite BEIDOU-3 M1 desde tu ubicación hoy.
+
+Para verificar la visibilidad y realizar el seguimiento, podemos calcular las coordenadas altitud-azimutales de este satélite en tu ubicación actual.
+
+¿Te gustaría realizar el seguimiento de esta pasada?
+
+si, por favor
+
+Sure! Could you please specify what information or action you would like to perform? Are you interested in observing a particular object, checking satellite passes, or anything else related to astronomy?
+
+No puedo crear chats de IA nuevos.  
+
+La pestaña de la IA no se puede redimensionar.  
+
+El estilo azul de las palabras de toda la UI no se distingue bien, encuentra otra paleta de color, una en azul y otra en rojo (para cuando es de noche).  
+
+El earth map no muestra la región desde donde los satélites son visibles o desde donde las estrellas se pueden ver, cambia eso para que se vea la trayectoria de satélites o la región visible de las estrellas.
+
+No me gusta la visualización del skychart, no es intuitiva, hazlo tipo simulación como en Stellarium, que se ve la bóveda celeste desde un POV, y que cuando clique en el planeta en el menú de la izquierda el POV se mueva progresivamente hasta llegar allí. También debe mostrar si es de día o de noche. El escenario es un campo abierto y cielo despejado. Representación precisa.
+
+Puedes usar Stellarium Web Engine o algo similar.
+
+Cuando clique una estrella o satélite en el menú de selección de la izquierda se debe abrir una mini ventana en la pantalla principal con una imagen del astro y una breve descripción (tipo carta de info).
+
+La IA debe ser capaz de interactuar con el propio programa: mostrar trayectorias, centrar objetos, activar overlays, etc. Acceso completo a UI como un usuario humano.
+
+La ubicación debe ser exacta y actualizada por GPS al iniciar el programa.
+
+Las trayectorias de satélites deben mostrarse completas, no parciales. Debe visualizarse el tramo total visible desde la órbita y el tramo realmente observable resaltado.
+
+---
+
+# INTERFAZ DE USUARIO
+
+The interface is structured as a modular control dashboard with a clear hierarchy:
+
+- Top-left: viewport principal (~65%), SKY / EARTH toggle
+- Top-right: viewport secundario con objeto seleccionado (render técnico x-ray o cámara)
+- Bottom-left: AI orb (core interactivo, animado)
+- Center-bottom: panel de texto IA (typewriter + waveform)
+- Bottom-right: selector de objetos astronómicos
+- Top bar: estado sistema + UTC + GPS + controles
+- Settings: tema, densidad UI, motion, scanlines, audio, galería
+
+---
+
+## SYSTEM STATUS BAR
+
+- ONLINE
+- SKYFIELD ACTIVE
+- MOUNT READY
+- CAMERA DETECTED (gPhoto2 / Fujifilm control)
+
+---
+
+# ASTRONOMICAL CONTROL SYSTEM (DATA OVERLAY)
+
+Este sistema agrupa telemetría astronómica en tiempo real.  
+Si no hay datos reales disponibles (montura no construida o sensores no activos), usar valores DUMMY con flag [SIM].
+
+## COORDENADAS (SYSTEM STATE)
+- AR (Ascensión Recta) [hh:mm:ss]
+- DEC (Declinación) [° ' "]
+- AH (Ángulo horario)
+- AZ (Azimut)
+- Z (Cenit)
+
+## ATMOSPHERIC & VISIBILITY
+- Masa del aire (Airmass)
+- T. al límite (limiting magnitude / visibility threshold)
+
+## ERROR MODEL
+- Error AR (arcsec / mas)
+- Error DEC (arcsec / mas)
+
+## CONTROL DINÁMICO DE MONTURA
+- Velocidad tracking (°/h)
+- Aplica a AR / DEC
+- Modo: SIDEREAL / SOLAR / LUNAR / CUSTOM
+
+## TIME SYSTEM MODULE (hover tooltips)
+- TU → Tiempo Universal (UTC)
+- TS → Tiempo sideral
+- Fecha → calendario local
+- Época → referencia orbital (J2000)
+- Día Jul → día juliano
+
+## BEHAVIOR RULES
+- Sin hardware → [SIM]
+- Con hardware → datos reales sobrescriben simulación
+- Todo campo debe ser consumible por IA
+
+---
+
+# STYLE
+
+Futuristic Interface (FUI), cyberpunk minimal, aerospace grade.  
+No gaming UI.
+
+---
+
+# COLOR SYSTEM
+
+Base:
+- #050507 background
+- #0B0D10 panels
+- #E6EAF0 text
+
+Red theme:
+- #FF3B3B accent
+
+Blue theme:
+- #3BA7FF accent
+
+Night red:
+- #FF2A2A low glare
+
+---
+
+# TYPOGRAPHY
+
+- Inter Tight / IBM Plex Sans Condensed
+- Mono: JetBrains Mono
+- Uppercase headers
+- Technical tone
+
+---
+
+# GRID
+
+- 12 columns
+- 8px base unit
+- subtle borders
+
+---
+
+# ANIMATIONS
+
+- Smooth 120–300ms
+- Orb breathing + particles
+- Typewriter text
+- Map interpolation
+
+---
+
+# VISUAL GOAL
+
+Sistema real de control astronómico funcional.  
+Preciso, técnico, operativo.
+No conceptual.
