@@ -14,28 +14,47 @@ REPO_DIR="${REPO_DIR:-$HOME/ik_llama.cpp}"
 SERVER_BIN="${SERVER_BIN:-$REPO_DIR/build/bin/llama-server}"
 MODELS_DIR="${MODELS_DIR:-$REPO_DIR/models}"
 
-# If MODEL is not set, auto-pick the LARGEST .gguf in the models dir that
-# isn't a vocab-only test file.  ik_llama.cpp ships several small
-# `ggml-vocab-*.gguf` files in its source tree under models/ for unit
-# tests; those are vocab-only and would crash llama-server (no
-# token_embd.weight tensor).  The size filter (≥100 MB) and the
-# name-prefix exclusion both protect against that.
-if [[ -z "${MODEL:-}" ]]; then
-    MODEL="$(
+# Resolve which GGUF file to load.
+#
+#   MODEL unset      → auto-pick the LARGEST real .gguf in $MODELS_DIR
+#   MODEL=/abs/path  → use exactly that file
+#   MODEL=substring  → first .gguf in $MODELS_DIR whose basename matches
+#                      (case-insensitive).  Lets you do `MODEL=8b ./run...`
+#                      to switch between Qwen3-8B and Qwen3-30B-A3B without
+#                      typing the whole filename.
+#
+# We always exclude the small `ggml-vocab-*.gguf` files that the
+# ik_llama.cpp source tree ships under models/ for unit tests — they're
+# vocab-only and would crash the server.
+resolve_model() {
+    local hint="$1"
+    if [[ -z "$hint" ]]; then
+        # Auto: largest real GGUF
         find "$MODELS_DIR" -maxdepth 2 -type f -name '*.gguf' \
-             ! -name 'ggml-vocab-*' \
-             -size +100M \
-             -printf '%s %p\n' 2>/dev/null \
-        | sort -rn \
-        | head -n1 \
-        | cut -d' ' -f2-
-    )"
-fi
-if [[ -z "$MODEL" || ! -f "$MODEL" ]]; then
-    echo "ERROR: no real GGUF model (>100 MB, non-vocab) found in $MODELS_DIR" >&2
-    echo "Set MODEL=/path/to/model.gguf or drop one into $MODELS_DIR" >&2
+             ! -name 'ggml-vocab-*' -size +100M -printf '%s %p\n' 2>/dev/null \
+        | sort -rn | head -n1 | cut -d' ' -f2-
+        return
+    fi
+    if [[ -f "$hint" ]]; then
+        echo "$hint"
+        return
+    fi
+    # Substring match (case-insensitive) inside the models dir.
+    find "$MODELS_DIR" -maxdepth 2 -type f -name '*.gguf' \
+         ! -name 'ggml-vocab-*' -size +100M -iname "*${hint}*.gguf" 2>/dev/null \
+    | head -n1
+}
+
+resolved="$(resolve_model "${MODEL:-}")"
+if [[ -z "$resolved" || ! -f "$resolved" ]]; then
+    echo "ERROR: could not resolve a GGUF for MODEL='${MODEL:-<auto>}'." >&2
+    echo "Available models in $MODELS_DIR:" >&2
+    find "$MODELS_DIR" -maxdepth 2 -type f -name '*.gguf' ! -name 'ggml-vocab-*' \
+        -size +100M -printf '  %p (%s bytes)\n' 2>/dev/null | sort >&2 \
+        || echo "  (none)" >&2
     exit 1
 fi
+MODEL="$resolved"
 
 HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-8080}"
