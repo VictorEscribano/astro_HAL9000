@@ -20,9 +20,7 @@ import json
 import logging
 from typing import Any, Type
 
-import instructor
-from openai import OpenAI
-
+from app.agent.llm import get_active_model_name, get_instructor_client
 from app.agent.models import (
     CameraExposure,
     CameraSequence,
@@ -53,27 +51,14 @@ from app.config import get_settings
 log = logging.getLogger("astroagent.tools")
 
 
-# ── Instructor / Ollama client ───────────────────────────────────────────────
-
-
-def _make_client():
-    """Build an OpenAI-compatible client pointed at Ollama, wrapped by
-    instructor in JSON mode (forces grammar-constrained output)."""
-    s = get_settings()
-    return instructor.from_openai(
-        OpenAI(base_url=f"{s.ollama_base_url}/v1", api_key="ollama"),
-        mode=instructor.Mode.JSON,
-    )
-
-
-_CLIENT = None
+# ── Instructor client (backend-agnostic) ─────────────────────────────────────
 
 
 def client():
-    global _CLIENT
-    if _CLIENT is None:
-        _CLIENT = _make_client()
-    return _CLIENT
+    """Backwards-compatible alias for the backend-aware instructor client.
+    All extraction calls below use this so they automatically follow the
+    `llm_backend` setting."""
+    return get_instructor_client()
 
 
 # ── Structured extraction ────────────────────────────────────────────────────
@@ -108,7 +93,7 @@ async def classify_intent(user_message: str, history: list[dict] | None = None) 
 
     def _call():
         return client().chat.completions.create(
-            model=s.ollama_model,
+            model=get_active_model_name(),
             response_model=Intent,
             temperature=0.1,
             max_retries=2,
@@ -137,7 +122,7 @@ async def make_plan(user_message: str, history: list[dict] | None = None) -> Pla
 
     def _call():
         return client().chat.completions.create(
-            model=s.ollama_model,
+            model=get_active_model_name(),
             response_model=Plan,
             temperature=0.1,
             max_retries=2,
@@ -222,7 +207,7 @@ async def extract_tool_args(
 
     def _call():
         return client().chat.completions.create(
-            model=s.ollama_model,
+            model=get_active_model_name(),
             response_model=schema,
             temperature=0.1,
             max_retries=2,
@@ -269,7 +254,7 @@ async def extract_tool_call(
 
     def _select():
         return client().chat.completions.create(
-            model=s.ollama_model,
+            model=get_active_model_name(),
             response_model=ToolSelection,
             temperature=0.1,
             max_retries=2,
@@ -298,7 +283,7 @@ async def extract_tool_call(
 
     def _extract():
         return client().chat.completions.create(
-            model=s.ollama_model,
+            model=get_active_model_name(),
             response_model=schema,
             temperature=0.1,
             max_retries=2,
