@@ -335,7 +335,22 @@ LLAMACPP_N_CTX=2048"
     ;;
 esac
 
-# ── Step 5: Frontend ──────────────────────────────────────────────
+# ── Step 5: Catálogos de datos ────────────────────────────────────
+step "Catálogos de datos astronómicos"
+
+mkdir -p "$SCRIPT_DIR/backend/data"
+NGC_CSV="$SCRIPT_DIR/backend/data/ngc_catalog.csv"
+if [ -f "$NGC_CSV" ] && [ "$(wc -l < "$NGC_CSV")" -gt 1000 ]; then
+    ok "Catálogo NGC/IC ya presente ($(wc -l < "$NGC_CSV") objetos)"
+else
+    info "Descargando catálogo OpenNGC (~3.7 MB, 13969 objetos NGC/IC)..."
+    wget -q --show-progress \
+        "https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/NGC.csv" \
+        -O "$NGC_CSV"
+    ok "Catálogo NGC descargado: $(( $(wc -l < "$NGC_CSV") - 1 )) objetos"
+fi
+
+# ── Step 6: Frontend ──────────────────────────────────────────────
 step "Frontend (npm install)"
 
 cd "$SCRIPT_DIR/frontend"
