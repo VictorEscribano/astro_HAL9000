@@ -213,7 +213,7 @@ print('Descarga completa')
     fi
     ENV_LLM="LLM_BACKEND=llamacpp
 LLAMACPP_MODEL_PATH=$MODEL_FILE
-LLAMACPP_N_CTX=32768"
+LLAMACPP_N_CTX=2048"
     ;;
 
 qwen3-4b)
@@ -231,7 +231,7 @@ print('Descarga completa')
     fi
     ENV_LLM="LLM_BACKEND=llamacpp
 LLAMACPP_MODEL_PATH=$MODEL_FILE
-LLAMACPP_N_CTX=32768"
+LLAMACPP_N_CTX=2048"
     ;;
 
 astrosage-8b)
@@ -260,7 +260,7 @@ print('Descarga completa')
     fi
     ENV_LLM="LLM_BACKEND=llamacpp
 LLAMACPP_MODEL_PATH=$MODEL_FILE
-LLAMACPP_N_CTX=131072"
+LLAMACPP_N_CTX=2048"
     ;;
 
 qwen3-8b)
@@ -279,7 +279,7 @@ print('Descarga completa')
     fi
     ENV_LLM="LLM_BACKEND=llamacpp
 LLAMACPP_MODEL_PATH=$MODEL_FILE
-LLAMACPP_N_CTX=131072"
+LLAMACPP_N_CTX=2048"
     ;;
 
 qwen3-30b-moe)
@@ -299,7 +299,7 @@ print('Descarga completa')
     fi
     ENV_LLM="LLM_BACKEND=llamacpp
 LLAMACPP_MODEL_PATH=$MODEL_FILE
-LLAMACPP_N_CTX=131072"
+LLAMACPP_N_CTX=2048"
     ;;
 
 qwen3-30b-moe-abliterated)
@@ -327,7 +327,7 @@ print('Descarga completa')
     fi
     ENV_LLM="LLM_BACKEND=llamacpp
 LLAMACPP_MODEL_PATH=$MODEL_FILE
-LLAMACPP_N_CTX=131072"
+LLAMACPP_N_CTX=2048"
     ;;
 
 *)

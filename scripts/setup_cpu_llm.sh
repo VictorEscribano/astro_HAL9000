@@ -66,7 +66,7 @@ qwen3-1.7b)
 
     ENV_BLOCK="LLM_BACKEND=llamacpp
 LLAMACPP_MODEL_PATH=$MODELS_DIR/Qwen3-1.7B-Q8_0.gguf
-LLAMACPP_N_CTX=32768"
+LLAMACPP_N_CTX=2048"
     ;;
 
 qwen3-4b)
@@ -80,7 +80,7 @@ qwen3-4b)
 
     ENV_BLOCK="LLM_BACKEND=llamacpp
 LLAMACPP_MODEL_PATH=$MODELS_DIR/Qwen3-4B-Q4_K_M.gguf
-LLAMACPP_N_CTX=32768"
+LLAMACPP_N_CTX=2048"
     ;;
 
 astrosage-8b)
@@ -95,7 +95,7 @@ astrosage-8b)
 
     ENV_BLOCK="LLM_BACKEND=llamacpp
 LLAMACPP_MODEL_PATH=$MODELS_DIR/AstroSage-LLaMA-3.1-8B-Q4_K_M.gguf
-LLAMACPP_N_CTX=131072"
+LLAMACPP_N_CTX=2048"
     ;;
 
 qwen3-30b-moe)
@@ -110,7 +110,7 @@ qwen3-30b-moe)
 
     ENV_BLOCK="LLM_BACKEND=llamacpp
 LLAMACPP_MODEL_PATH=$MODELS_DIR/Qwen3-30B-A3B-Q4_K_M.gguf
-LLAMACPP_N_CTX=131072"
+LLAMACPP_N_CTX=2048"
     ;;
 
 qwen3-30b-moe-abliterated)
@@ -125,7 +125,7 @@ qwen3-30b-moe-abliterated)
 
     ENV_BLOCK="LLM_BACKEND=llamacpp
 LLAMACPP_MODEL_PATH=$MODELS_DIR/Qwen3-30B-A3B-abliterated-Q4_K_M.gguf
-LLAMACPP_N_CTX=131072"
+LLAMACPP_N_CTX=2048"
     ;;
 
 qwen3-8b)
@@ -139,7 +139,7 @@ qwen3-8b)
 
     ENV_BLOCK="LLM_BACKEND=llamacpp
 LLAMACPP_MODEL_PATH=$MODELS_DIR/Qwen3-8B-Q4_K_M.gguf
-LLAMACPP_N_CTX=131072"
+LLAMACPP_N_CTX=2048"
     ;;
 
 *)
