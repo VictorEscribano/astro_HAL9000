@@ -207,8 +207,13 @@ def build_system_prompt(memory_context: str = "", session_context: str | None = 
             f"(≈{max_rate/15:.1f}× sidérea)\n"
             f"- Modelo LLM: {s.ollama_model}"
         )
-    return HAL_SYSTEM_PROMPT.format(
+    rendered = HAL_SYSTEM_PROMPT.format(
         tool_list=tool_list_for_prompt(),
         memory_context=memory_context or "(sin observaciones previas)",
         session_context=session_context,
     )
+    # For llamacpp/CPU backends, disable Qwen3 thinking mode to avoid generating
+    # thousands of invisible <think> tokens before the first visible word.
+    if s.llm_backend in ("llamacpp", "onnx"):
+        rendered = "/no_think\n" + rendered
+    return rendered

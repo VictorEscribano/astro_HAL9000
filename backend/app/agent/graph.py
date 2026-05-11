@@ -567,7 +567,11 @@ async def _stream_response(state: HALState) -> AsyncIterator[str]:
     (num_ctx=2048, num_predict=128 chop replies mid-sentence); the factory
     widens both.  For ik_llama, num_ctx is set at server launch — only
     num_predict (max_tokens) takes effect per request."""
-    llm = make_streaming_llm(temperature=0.3, num_ctx=8192, num_predict=1024)
+    from app.config import get_settings as _gs
+    _s = _gs()
+    _n_ctx = _s.llamacpp_n_ctx if _s.llm_backend in ("llamacpp", "onnx") else 8192
+    _max_tok = min(512, _n_ctx // 4)
+    llm = make_streaming_llm(temperature=0.3, num_ctx=_n_ctx, num_predict=_max_tok)
 
     system = build_system_prompt(memory_context=state.get("memory_context") or "")
     seed = state.get("response_seed") or ""
