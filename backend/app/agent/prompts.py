@@ -15,6 +15,18 @@ from app.agent.models import tool_list_for_prompt
 from app.config import get_settings
 
 
+# Compact prompt for CPU backends (llamacpp/onnx) where every token counts.
+# Kept to ~200 tokens so prefill stays under ~5s on a 5-core CPU.
+HAL_SYSTEM_PROMPT_CPU = """\
+/no_think
+Eres HAL, IA del observatorio. Responde siempre en el idioma del usuario.
+NO uses bloques <think>. NO inventes resultados. Solo el texto final para el usuario.
+
+Herramientas disponibles: {tool_list}
+Sesión: {session_context}
+"""
+
+
 HAL_SYSTEM_PROMPT = """\
 # IDENTIDAD Y ROL
 
@@ -207,13 +219,14 @@ def build_system_prompt(memory_context: str = "", session_context: str | None = 
             f"(≈{max_rate/15:.1f}× sidérea)\n"
             f"- Modelo LLM: {s.ollama_model}"
         )
-    rendered = HAL_SYSTEM_PROMPT.format(
+    if s.llm_backend in ("llamacpp", "onnx"):
+        # Use the compact prompt to minimize prefill time on CPU.
+        return HAL_SYSTEM_PROMPT_CPU.format(
+            tool_list=tool_list_for_prompt(),
+            session_context=session_context,
+        )
+    return HAL_SYSTEM_PROMPT.format(
         tool_list=tool_list_for_prompt(),
         memory_context=memory_context or "(sin observaciones previas)",
         session_context=session_context,
     )
-    # For llamacpp/CPU backends, disable Qwen3 thinking mode to avoid generating
-    # thousands of invisible <think> tokens before the first visible word.
-    if s.llm_backend in ("llamacpp", "onnx"):
-        rendered = "/no_think\n" + rendered
-    return rendered

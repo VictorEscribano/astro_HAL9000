@@ -91,6 +91,12 @@ def make_streaming_llm(
 
     base_url, model = _backend_endpoint(s)
     log.info("LLM (stream) → %s  base=%s  model=%s", s.llm_backend, base_url, model)
+    extra: dict = {}
+    if s.llm_backend in ("llamacpp", "onnx"):
+        # CPU inference can take >2 min for first token on long prompts;
+        # disable the LangChain chunk-level timeout entirely.
+        extra["stream_chunk_timeout"] = None
+
     return ChatOpenAI(
         model=model,
         base_url=base_url,
@@ -98,4 +104,5 @@ def make_streaming_llm(
         temperature=temperature,
         max_tokens=num_predict,
         streaming=True,
+        **extra,
     )
