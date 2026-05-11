@@ -106,13 +106,16 @@ fi
 
 PY="$VENV/bin/python"
 PIP="$VENV/bin/pip"
-"$PIP" install --quiet --upgrade pip wheel setuptools
+
+# Upgrade pip silencing ROS conflict noise (launch-ros requires pyyaml but
+# it's a system-level ROS package — irrelevant inside the venv).
+"$PIP" install --quiet --upgrade pip wheel setuptools pyyaml
 
 # ── Step 2: Backend dependencies ─────────────────────────────────
 step "Dependencias del backend (requirements.txt)"
 
 info "Instalando dependencias base..."
-"$PIP" install --quiet -r "$SCRIPT_DIR/backend/requirements.txt"
+"$PIP" install --quiet --no-warn-conflicts -r "$SCRIPT_DIR/backend/requirements.txt"
 ok "Backend base instalado"
 
 # ── Step 3: CPU LLM backend ───────────────────────────────────────
