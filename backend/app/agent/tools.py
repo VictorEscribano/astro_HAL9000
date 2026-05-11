@@ -119,7 +119,7 @@ async def classify_intent(user_message: str, history: list[dict] | None = None) 
     s = get_settings()
 
     if s.llm_backend in ("llamacpp", "onnx") and _fast_conv_check(user_message):
-        return Intent(intent="conversation", rationale="keyword fast-path")
+        return Intent(kind="conversation", rationale="keyword fast-path")
 
     history_block = _format_history_tail(history)
     prompt = history_block + INTENT_CLASSIFIER_PROMPT.format(user_message=user_message)
