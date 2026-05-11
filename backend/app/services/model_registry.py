@@ -77,11 +77,11 @@ REGISTRY: list[ModelProfile] = [
 
     ModelProfile(
         id="qwen3-1.7b",
-        name="Qwen3-1.7B Q4_K_M",
+        name="Qwen3-1.7B Q8_0",
         hf_repo="Qwen/Qwen3-1.7B-GGUF",
-        hf_filename="qwen3-1.7b-q4_k_m.gguf",
+        hf_filename="Qwen3-1.7B-Q8_0.gguf",
         backend="llamacpp",
-        quant="Q4_K_M",
+        quant="Q8_0",
         params_b=1.7,
         active_params_b=1.7,
         ram_gb=1.5,
@@ -93,7 +93,7 @@ REGISTRY: list[ModelProfile] = [
         notes="Ultra-fast. Thinking mode already supported by HAL's <think> stripper.",
         download_cmd=(
             "hf download Qwen/Qwen3-1.7B-GGUF "
-            "qwen3-1.7b-q4_k_m.gguf --local-dir models/"
+            "Qwen3-1.7B-Q8_0.gguf --local-dir models/"
         ),
     ),
 
@@ -103,7 +103,7 @@ REGISTRY: list[ModelProfile] = [
         id="qwen3-4b",
         name="Qwen3-4B Q4_K_M",
         hf_repo="Qwen/Qwen3-4B-GGUF",
-        hf_filename="qwen3-4b-q4_k_m.gguf",
+        hf_filename="Qwen3-4B-Q4_K_M.gguf",
         backend="llamacpp",
         quant="Q4_K_M",
         params_b=4.0,
@@ -117,7 +117,7 @@ REGISTRY: list[ModelProfile] = [
         notes="Best all-round Pareto point. Strong reasoning + thinking mode + Spanish.",
         download_cmd=(
             "hf download Qwen/Qwen3-4B-GGUF "
-            "qwen3-4b-q4_k_m.gguf --local-dir models/"
+            "Qwen3-4B-Q4_K_M.gguf --local-dir models/"
         ),
     ),
 
@@ -150,7 +150,7 @@ REGISTRY: list[ModelProfile] = [
         id="qwen3-30b-moe",
         name="Qwen3-30B-A3B Q4_K_M (MoE)",
         hf_repo="Qwen/Qwen3-30B-A3B-GGUF",
-        hf_filename="qwen3-30b-a3b-q4_k_m.gguf",
+        hf_filename="Qwen3-30B-A3B-Q4_K_M.gguf",
         backend="llamacpp",
         quant="Q4_K_M",
         params_b=30.0,
@@ -166,7 +166,7 @@ REGISTRY: list[ModelProfile] = [
               "Abliterated (uncensored) variant: huihui-ai/Qwen3-30B-A3B-abliterated-GGUF",
         download_cmd=(
             "hf download Qwen/Qwen3-30B-A3B-GGUF "
-            "qwen3-30b-a3b-q4_k_m.gguf --local-dir models/"
+            "Qwen3-30B-A3B-Q4_K_M.gguf --local-dir models/"
         ),
     ),
 
@@ -198,7 +198,7 @@ REGISTRY: list[ModelProfile] = [
         id="qwen3-8b",
         name="Qwen3-8B Q4_K_M",
         hf_repo="Qwen/Qwen3-8B-GGUF",
-        hf_filename="qwen3-8b-q4_k_m.gguf",
+        hf_filename="Qwen3-8B-Q4_K_M.gguf",
         backend="llamacpp",
         quant="Q4_K_M",
         params_b=8.0,
@@ -212,7 +212,7 @@ REGISTRY: list[ModelProfile] = [
         notes="Dense 8B, thinking mode, multilingual. Strong reasoning.",
         download_cmd=(
             "hf download Qwen/Qwen3-8B-GGUF "
-            "qwen3-8b-q4_k_m.gguf --local-dir models/"
+            "Qwen3-8B-Q4_K_M.gguf --local-dir models/"
         ),
     ),
 ]

@@ -197,14 +197,15 @@ ONNX_MODEL_PATH=$MODEL_PATH"
     ;;
 
 qwen3-1.7b)
-    MODEL_FILE="$MODELS_DIR/qwen3-1.7b-q4_k_m.gguf"
+    # Repo only publishes Q8_0 (no Q4_K_M available for this size)
+    MODEL_FILE="$MODELS_DIR/Qwen3-1.7B-Q8_0.gguf"
     warn_if_tight 2
     if [ -f "$MODEL_FILE" ]; then
         ok "Modelo ya descargado: $MODEL_FILE"
     else
-        info "Descargando Qwen3-1.7B Q4_K_M (~1.2 GB)..."
+        info "Descargando Qwen3-1.7B Q8_0 (~1.8 GB)..."
         "$HF_CLI" download Qwen/Qwen3-1.7B-GGUF \
-            qwen3-1.7b-q4_k_m.gguf \
+            Qwen3-1.7B-Q8_0.gguf \
             --local-dir "$MODELS_DIR"
         ok "Qwen3-1.7B descargado"
     fi
@@ -214,13 +215,13 @@ LLAMACPP_N_CTX=32768"
     ;;
 
 qwen3-4b)
-    MODEL_FILE="$MODELS_DIR/qwen3-4b-q4_k_m.gguf"
+    MODEL_FILE="$MODELS_DIR/Qwen3-4B-Q4_K_M.gguf"
     if [ -f "$MODEL_FILE" ]; then
         ok "Modelo ya descargado: $MODEL_FILE"
     else
         info "Descargando Qwen3-4B Q4_K_M (~2.5 GB)..."
         "$HF_CLI" download Qwen/Qwen3-4B-GGUF \
-            qwen3-4b-q4_k_m.gguf \
+            Qwen3-4B-Q4_K_M.gguf \
             --local-dir "$MODELS_DIR"
         ok "Qwen3-4B descargado"
     fi
@@ -230,14 +231,21 @@ LLAMACPP_N_CTX=32768"
     ;;
 
 astrosage-8b)
+    # Repo requires HuggingFace login (gated model)
     MODEL_FILE="$MODELS_DIR/AstroSage-LLaMA-3.1-8B-Q4_K_M.gguf"
     warn_if_tight 6
     if [ -f "$MODEL_FILE" ]; then
         ok "Modelo ya descargado: $MODEL_FILE"
     else
+        if [ -z "${HF_TOKEN:-}" ]; then
+            warn "AstroSage requiere autenticación en HuggingFace."
+            warn "Obtén tu token en https://huggingface.co/settings/tokens y ejecútalo así:"
+            warn "  HF_TOKEN=hf_xxx ./install.sh astrosage-8b"
+            die "Token HF_TOKEN no encontrado. Abortando."
+        fi
         info "Descargando AstroSage-8B Q4_K_M (~5 GB)..."
-        info "→ Especialista en astronomía (paridad GPT-4o en benchmark AstroMLab-1)"
-        "$HF_CLI" download AstroMLab/AstroSage-LLaMA-3.1-8B-GGUF \
+        info "→ Especialista en astronomía (paridad GPT-4o en AstroMLab-1)"
+        HF_TOKEN="$HF_TOKEN" "$HF_CLI" download AstroMLab/AstroSage-LLaMA-3.1-8B-GGUF \
             AstroSage-LLaMA-3.1-8B-Q4_K_M.gguf \
             --local-dir "$MODELS_DIR"
         ok "AstroSage-8B descargado"
@@ -248,14 +256,14 @@ LLAMACPP_N_CTX=131072"
     ;;
 
 qwen3-8b)
-    MODEL_FILE="$MODELS_DIR/qwen3-8b-q4_k_m.gguf"
+    MODEL_FILE="$MODELS_DIR/Qwen3-8B-Q4_K_M.gguf"
     warn_if_tight 6
     if [ -f "$MODEL_FILE" ]; then
         ok "Modelo ya descargado: $MODEL_FILE"
     else
         info "Descargando Qwen3-8B Q4_K_M (~5 GB)..."
         "$HF_CLI" download Qwen/Qwen3-8B-GGUF \
-            qwen3-8b-q4_k_m.gguf \
+            Qwen3-8B-Q4_K_M.gguf \
             --local-dir "$MODELS_DIR"
         ok "Qwen3-8B descargado"
     fi
@@ -265,7 +273,7 @@ LLAMACPP_N_CTX=131072"
     ;;
 
 qwen3-30b-moe)
-    MODEL_FILE="$MODELS_DIR/qwen3-30b-a3b-q4_k_m.gguf"
+    MODEL_FILE="$MODELS_DIR/Qwen3-30B-A3B-Q4_K_M.gguf"
     warn_if_tight 10
     if [ -f "$MODEL_FILE" ]; then
         ok "Modelo ya descargado: $MODEL_FILE"
@@ -273,7 +281,7 @@ qwen3-30b-moe)
         info "Descargando Qwen3-30B-A3B Q4_K_M (~8.5 GB)..."
         info "→ MoE: 30B parámetros totales, 3B activos por token"
         "$HF_CLI" download Qwen/Qwen3-30B-A3B-GGUF \
-            qwen3-30b-a3b-q4_k_m.gguf \
+            Qwen3-30B-A3B-Q4_K_M.gguf \
             --local-dir "$MODELS_DIR"
         ok "Qwen3-30B-A3B descargado"
     fi
@@ -283,13 +291,20 @@ LLAMACPP_N_CTX=131072"
     ;;
 
 qwen3-30b-moe-abliterated)
+    # huihui-ai repos require HuggingFace login
     MODEL_FILE="$MODELS_DIR/Qwen3-30B-A3B-abliterated-Q4_K_M.gguf"
     warn_if_tight 10
     if [ -f "$MODEL_FILE" ]; then
         ok "Modelo ya descargado: $MODEL_FILE"
     else
+        if [ -z "${HF_TOKEN:-}" ]; then
+            warn "huihui-ai requiere autenticación en HuggingFace."
+            warn "Obtén tu token en https://huggingface.co/settings/tokens y ejecútalo así:"
+            warn "  HF_TOKEN=hf_xxx ./install.sh qwen3-30b-moe-abliterated"
+            die "Token HF_TOKEN no encontrado. Abortando."
+        fi
         info "Descargando Qwen3-30B-A3B abliterated Q4_K_M (~8.5 GB, huihui-ai)..."
-        "$HF_CLI" download huihui-ai/Qwen3-30B-A3B-abliterated-GGUF \
+        HF_TOKEN="$HF_TOKEN" "$HF_CLI" download huihui-ai/Qwen3-30B-A3B-abliterated-GGUF \
             "Qwen3-30B-A3B-abliterated-Q4_K_M.gguf" \
             --local-dir "$MODELS_DIR"
         ok "Qwen3-30B-A3B abliterated descargado"
