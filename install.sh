@@ -350,6 +350,17 @@ else
     ok "Catálogo NGC descargado: $(( $(wc -l < "$NGC_CSV") - 1 )) objetos"
 fi
 
+HYG_CSV="$SCRIPT_DIR/backend/data/hyg_full.csv"
+if [ -f "$HYG_CSV" ] && [ "$(wc -l < "$HYG_CSV")" -gt 10000 ]; then
+    ok "Catálogo HYG ya presente ($(wc -l < "$HYG_CSV") estrellas)"
+else
+    info "Descargando catálogo HYG v41 (~28 MB, 119626 estrellas)..."
+    curl -L -s --progress-bar \
+        "https://raw.githubusercontent.com/astronexus/HYG-Database/master/hyg/CURRENT/hygdata_v41.csv" \
+        -o "$HYG_CSV"
+    ok "Catálogo HYG descargado: $(( $(wc -l < "$HYG_CSV") - 1 )) estrellas"
+fi
+
 # ── Step 6: Frontend ──────────────────────────────────────────────
 step "Frontend (npm install)"
 
