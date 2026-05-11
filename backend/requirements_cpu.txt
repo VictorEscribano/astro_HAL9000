@@ -1,0 +1,21 @@
+# CPU LLM backends — install the one matching your chosen MODEL_PROFILE
+#
+# Profile                   Install command
+# ─────────────────────     ────────────────────────────────────────
+# phi4mini-onnx             pip install onnxruntime-genai transformers
+# qwen3-* / astrosage-8b    pip install "llama-cpp-python[server]"
+# qwen3-30b-moe-*           pip install "llama-cpp-python[server]"
+#
+# For best CPU performance, build llama-cpp-python from source with AVX2/AVX-512:
+#   CMAKE_ARGS="-DGGML_NATIVE=ON" pip install llama-cpp-python[server] --no-binary llama-cpp-python
+
+# ONNX backend (Phi-4-mini INT4 and similar Microsoft ONNX models)
+onnxruntime-genai>=0.5.0
+transformers>=4.40.0    # for chat template formatting
+
+# llama-cpp-python embedded server (GGUF models: Qwen3, AstroSage, huihui-ai)
+# Note: [server] extra includes fastapi + uvicorn needed for the sub-app
+llama-cpp-python[server]>=0.3.0
+
+# Model downloader (used by setup_cpu_llm.sh)
+huggingface-hub>=0.23.0

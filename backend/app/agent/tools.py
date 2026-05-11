@@ -20,9 +20,7 @@ import json
 import logging
 from typing import Any, Type
 
-import instructor
-from openai import OpenAI
-
+from app.agent.llm import get_active_model_name, get_instructor_client
 from app.agent.models import (
     CameraExposure,
     CameraSequence,
@@ -45,6 +43,9 @@ from app.agent.models import (
     ToolSelection,
     TrackingFeasibilityCheck,
     WeatherQuery,
+    WebSearch,
+    YouTubeOpen,
+    WidgetCreate,
     tool_list_for_prompt,
 )
 from app.agent.prompts import INTENT_CLASSIFIER_PROMPT, TOOL_EXTRACTION_PROMPT
@@ -53,27 +54,14 @@ from app.config import get_settings
 log = logging.getLogger("astroagent.tools")
 
 
-# ── Instructor / Ollama client ───────────────────────────────────────────────
-
-
-def _make_client():
-    """Build an OpenAI-compatible client pointed at Ollama, wrapped by
-    instructor in JSON mode (forces grammar-constrained output)."""
-    s = get_settings()
-    return instructor.from_openai(
-        OpenAI(base_url=f"{s.ollama_base_url}/v1", api_key="ollama"),
-        mode=instructor.Mode.JSON,
-    )
-
-
-_CLIENT = None
+# ── Instructor client (backend-agnostic) ─────────────────────────────────────
 
 
 def client():
-    global _CLIENT
-    if _CLIENT is None:
-        _CLIENT = _make_client()
-    return _CLIENT
+    """Backwards-compatible alias for the backend-aware instructor client.
+    All extraction calls below use this so they automatically follow the
+    `llm_backend` setting."""
+    return get_instructor_client()
 
 
 # ── Structured extraction ────────────────────────────────────────────────────
@@ -99,19 +87,51 @@ def _format_history_tail(history: list[dict] | None, max_turns: int = 4) -> str:
     return "Contexto reciente de la conversación:\n" + "\n".join(lines) + "\n\n"
 
 
+_CONV_KEYWORDS = {
+    "hola", "hi", "hello", "hey", "buenas", "buenos", "gracias", "thank", "thanks",
+    "ok", "vale", "genial", "perfecto", "cool", "adiós", "bye", "adios",
+    "qué es", "que es", "qué son", "cuéntame", "cuentame", "explícame", "explicame",
+    "what is", "tell me about", "explain",
+}
+
+
+def _fast_conv_check(msg: str) -> bool:
+    """Return True if the message is obviously conversational (no tool needed).
+    Bypasses the LLM call entirely to save CPU time."""
+    low = msg.lower().strip()
+    # Short greetings / single words
+    if len(low.split()) <= 2 and any(kw in low for kw in _CONV_KEYWORDS):
+        return True
+    # No action verbs or hardware keywords → likely conversation
+    action_hints = {"mueve", "apunta", "goto", "park", "sigue", "track", "expón",
+                    "busca", "satellite", "iss", "clima", "weather", "visible",
+                    "foto", "imagen", "graba", "abre youtube", "crea widget",
+                    "move", "point", "expose", "search", "show"}
+    if not any(h in low for h in action_hints) and len(low.split()) <= 6:
+        return True
+    return False
+
+
 async def classify_intent(user_message: str, history: list[dict] | None = None) -> Intent:
     """Decide whether this turn needs a tool or is conversation.  Runs as a
-    blocking openai call wrapped in a thread to keep the event loop free."""
+    blocking openai call wrapped in a thread to keep the event loop free.
+    For CPU backends a keyword fast-path is applied first to skip the LLM."""
     s = get_settings()
+
+    if s.llm_backend in ("llamacpp", "onnx") and _fast_conv_check(user_message):
+        return Intent(kind="conversation", rationale="keyword fast-path")
+
     history_block = _format_history_tail(history)
     prompt = history_block + INTENT_CLASSIFIER_PROMPT.format(user_message=user_message)
+    max_retries = 1 if s.llm_backend in ("llamacpp", "onnx") else 2
 
     def _call():
         return client().chat.completions.create(
-            model=s.ollama_model,
+            model=get_active_model_name(),
             response_model=Intent,
             temperature=0.1,
-            max_retries=2,
+            max_retries=max_retries,
+            max_tokens=80,
             messages=[
                 {"role": "system",
                  "content": (
@@ -135,12 +155,15 @@ async def make_plan(user_message: str, history: list[dict] | None = None) -> Pla
     tool_list = tool_list_for_prompt()
     history_block = _format_history_tail(history)
 
+    max_retries = 1 if get_settings().llm_backend in ("llamacpp", "onnx") else 2
+
     def _call():
         return client().chat.completions.create(
-            model=s.ollama_model,
+            model=get_active_model_name(),
             response_model=Plan,
             temperature=0.1,
-            max_retries=2,
+            max_retries=max_retries,
+            max_tokens=120,
             messages=[
                 {"role": "system",
                  "content": (
@@ -220,12 +243,15 @@ async def extract_tool_args(
     if prev_error:
         err_block = f"El intento anterior falló con: {prev_error}\nCorrige los argumentos.\n\n"
 
+    max_retries = 1 if s.llm_backend in ("llamacpp", "onnx") else 2
+
     def _call():
         return client().chat.completions.create(
-            model=s.ollama_model,
+            model=get_active_model_name(),
             response_model=schema,
             temperature=0.1,
-            max_retries=2,
+            max_retries=max_retries,
+            max_tokens=150,
             messages=[
                 {"role": "system",
                  "content": (
@@ -269,7 +295,7 @@ async def extract_tool_call(
 
     def _select():
         return client().chat.completions.create(
-            model=s.ollama_model,
+            model=get_active_model_name(),
             response_model=ToolSelection,
             temperature=0.1,
             max_retries=2,
@@ -298,7 +324,7 @@ async def extract_tool_call(
 
     def _extract():
         return client().chat.completions.create(
-            model=s.ollama_model,
+            model=get_active_model_name(),
             response_model=schema,
             temperature=0.1,
             max_retries=2,
@@ -471,7 +497,50 @@ async def execute_tool(call: HALToolCall) -> ToolResult:
         except Exception as e:
             return _err("python_exec", str(e))
 
+    # Web / Wikipedia search ──────────────────────────────────────────────────
+    if isinstance(call, WebSearch):
+        from app.tools.web import find_youtube_video, search_web, search_wikipedia
+        try:
+            source = call.source
+            if source == "wikipedia" or (source == "auto" and _looks_like_wiki(call.query)):
+                result = await search_wikipedia(call.query)
+                if "error" not in result:
+                    return _ok("web_search", {"source": "wikipedia", "results": [result]})
+                # fall through to web search on wiki failure
+            results = await search_web(call.query, max_results=5)
+            return _ok("web_search", {"source": "web", "results": results})
+        except Exception as e:
+            return _err("web_search", str(e))
+
+    # YouTube ──────────────────────────────────────────────────────────────────
+    if isinstance(call, YouTubeOpen):
+        from app.tools.web import find_youtube_video
+        try:
+            result = await find_youtube_video(call.query)
+            if "error" in result:
+                return _err("youtube_open", result["error"])
+            return _ok("youtube_open", result)
+        except Exception as e:
+            return _err("youtube_open", str(e))
+
+    # Widget forge ────────────────────────────────────────────────────────────
+    if isinstance(call, WidgetCreate):
+        from app.tools.widget_forge import save_widget
+        try:
+            record = save_widget(call.name, call.description, call.html_content)
+            return _ok("widget_create", record)
+        except Exception as e:
+            return _err("widget_create", str(e))
+
     return _err(tool_name, f"Sin dispatcher para {tool_name}.")
+
+
+def _looks_like_wiki(query: str) -> bool:
+    """Heuristic: does this query look like it wants a Wikipedia article?"""
+    wiki_keywords = {"qué es", "what is", "who is", "quién es", "historia de",
+                     "definición", "definition", "wikipedia", "enciclopedia"}
+    q = query.lower()
+    return any(kw in q for kw in wiki_keywords)
 
 
 # ── Frontend UI commands derived from tool results ───────────────────────────
@@ -510,5 +579,28 @@ def ui_command_from_result(call: HALToolCall, result: ToolResult) -> dict | None
 
     if isinstance(call, (MountGoto, MountTrack, MountPark, MountAbort)):
         return {"action": "mount_command", "result": result.result}
+
+    if isinstance(call, YouTubeOpen) and isinstance(result.result, dict):
+        d = result.result
+        return {
+            "action": "open_youtube",
+            "video_id": d.get("video_id"),
+            "title": d.get("title"),
+            "embed_url": d.get("embed_url"),
+            "url": d.get("url"),
+        }
+
+    if isinstance(call, WebSearch) and isinstance(result.result, dict):
+        sources = result.result.get("results", [])
+        if sources:
+            return {"action": "show_sources", "sources": sources}
+
+    if isinstance(call, WidgetCreate) and isinstance(result.result, dict):
+        d = result.result
+        return {
+            "action": "new_widget",
+            "widget_id": d.get("id"),
+            "name": d.get("name"),
+        }
 
     return None

@@ -28,6 +28,7 @@ yarn-error.log*
 
 # ── Runtime data / persistence ──────────────────────────
 backend/data/
+models/
 *.sqlite
 *.db
 *.log

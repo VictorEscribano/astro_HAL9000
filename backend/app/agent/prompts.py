@@ -15,6 +15,18 @@ from app.agent.models import tool_list_for_prompt
 from app.config import get_settings
 
 
+# Compact prompt for CPU backends (llamacpp/onnx) where every token counts.
+# Kept to ~200 tokens so prefill stays under ~5s on a 5-core CPU.
+HAL_SYSTEM_PROMPT_CPU = """\
+/no_think
+Eres HAL, IA del observatorio. Responde siempre en el idioma del usuario.
+NO uses bloques <think>. NO inventes resultados. Solo el texto final para el usuario.
+
+Herramientas disponibles: {tool_list}
+Sesión: {session_context}
+"""
+
+
 HAL_SYSTEM_PROMPT = """\
 # IDENTIDAD Y ROL
 
@@ -125,6 +137,11 @@ Clasifica el siguiente turno del usuario en una de dos categorías:
   cuando HAL puede responder con conocimiento general SIN datos en vivo
   ni acceso al hardware.
 
+Además, clasifica siempre como "tool":
+  · Buscar información actualizada en internet o Wikipedia
+  · Pedir reproducir, escuchar o abrir un vídeo/música/podcast en YouTube
+  · Crear un widget, contador, temporizador u otra herramienta interactiva
+
 En la duda, prefiere "tool".  Es preferible ejecutar una herramienta
 informativa que dar un dato impreciso.
 
@@ -177,6 +194,12 @@ Genera la respuesta final al usuario en su idioma.  Reglas estrictas:
 - Si la herramienta produjo una visualización (mapa, gráfico, lista),
   basta con confirmar brevemente que ya está disponible y dar 1–3 datos
   clave en lenguaje natural.
+- Si se ejecutó `web_search` o `wikipedia`, menciona los títulos de las
+  fuentes al final de tu respuesta en formato Markdown:
+  `**Fuentes:** [Título](url), [Título2](url2)`.
+  Usa SOLO las URLs reales devueltas por la herramienta — nunca inventes URLs.
+- Si se creó un widget con `widget_create`, confirma brevemente el nombre
+  y que ya está disponible en el panel de Widgets personalizados.
 """
 
 
@@ -195,6 +218,12 @@ def build_system_prompt(memory_context: str = "", session_context: str | None = 
             f"- Montura OAT: tasa máxima {max_rate:.0f} arcsec/s "
             f"(≈{max_rate/15:.1f}× sidérea)\n"
             f"- Modelo LLM: {s.ollama_model}"
+        )
+    if s.llm_backend in ("llamacpp", "onnx"):
+        # Use the compact prompt to minimize prefill time on CPU.
+        return HAL_SYSTEM_PROMPT_CPU.format(
+            tool_list=tool_list_for_prompt(),
+            session_context=session_context,
         )
     return HAL_SYSTEM_PROMPT.format(
         tool_list=tool_list_for_prompt(),

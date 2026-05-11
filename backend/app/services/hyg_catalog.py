@@ -21,6 +21,12 @@ SPECTRAL_COLOR: dict[str, str] = {
 @lru_cache(maxsize=1)
 def load_hyg(max_mag: float = 8.0) -> List[dict]:
     """Load HYG stars up to max_mag. Returns list of dicts."""
+    if not HYG_CSV.exists():
+        raise FileNotFoundError(
+            f"HYG catalog not found at {HYG_CSV}. "
+            "Run: curl -L -o backend/data/hyg_full.csv "
+            "https://raw.githubusercontent.com/astronexus/HYG-Database/master/hyg/CURRENT/hygdata_v41.csv"
+        )
     stars: List[dict] = []
     with open(HYG_CSV, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)

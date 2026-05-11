@@ -43,9 +43,9 @@ import uuid
 from typing import Any, AsyncIterator, Literal, TypedDict
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_ollama import ChatOllama
 from langgraph.graph import END, START, StateGraph
 
+from app.agent.llm import make_streaming_llm
 from app.agent.memory import get_memory
 from app.agent.models import HALToolCall, Intent, Plan, ToolResult
 from app.agent.prompts import RESPONSE_GENERATION_PROMPT, build_system_prompt
@@ -56,7 +56,6 @@ from app.agent.tools import (
     make_plan,
     ui_command_from_result,
 )
-from app.config import get_settings
 
 log = logging.getLogger("astroagent.graph")
 
@@ -563,19 +562,16 @@ class _ThinkStripper:
 
 
 async def _stream_response(state: HALState) -> AsyncIterator[str]:
-    """Stream the final assistant message token-by-token from Ollama."""
-    s = get_settings()
-    # Ollama defaults are tight: num_ctx=2048 (truncates the HAL system prompt
-    # + memory + history before generation even starts) and num_predict=128
-    # (chops replies mid-sentence).  Qwen 2.5 7B handles 32k+ comfortably on
-    # the RTX 3070 Ti, so we widen both.
-    llm = ChatOllama(
-        model=s.ollama_model,
-        base_url=s.ollama_base_url,
-        temperature=0.3,
-        num_ctx=8192,
-        num_predict=1024,
-    )
+    """Stream the final assistant message token-by-token from the configured
+    LLM backend (Ollama or ik_llama.cpp).  Ollama defaults are tight
+    (num_ctx=2048, num_predict=128 chop replies mid-sentence); the factory
+    widens both.  For ik_llama, num_ctx is set at server launch — only
+    num_predict (max_tokens) takes effect per request."""
+    from app.config import get_settings as _gs
+    _s = _gs()
+    _n_ctx = _s.llamacpp_n_ctx if _s.llm_backend in ("llamacpp", "onnx") else 8192
+    _max_tok = min(512, _n_ctx // 4)
+    llm = make_streaming_llm(temperature=0.3, num_ctx=_n_ctx, num_predict=_max_tok)
 
     system = build_system_prompt(memory_context=state.get("memory_context") or "")
     seed = state.get("response_seed") or ""

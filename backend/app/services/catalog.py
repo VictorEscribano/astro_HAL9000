@@ -30,6 +30,12 @@ def _parse_dec(dec_str: str) -> Optional[float]:
 
 @lru_cache(maxsize=1)
 def load_catalog() -> List[dict]:
+    if not NGC_CSV.exists():
+        raise FileNotFoundError(
+            f"NGC catalog not found at {NGC_CSV}. "
+            "Run: wget -O backend/data/ngc_catalog.csv "
+            "https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/NGC.csv"
+        )
     objects = []
     with open(NGC_CSV, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f, delimiter=";")

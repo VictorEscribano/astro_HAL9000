@@ -9,6 +9,8 @@ import ObjectView from "./components/ObjectView/ObjectView";
 import ObjectSelector from "./components/ObjectSelector/ObjectSelector";
 import BottomBar from "./components/BottomBar/BottomBar";
 import PanelFrame from "./components/ui/PanelFrame";
+import YouTubePanel from "./components/YouTube/YouTubePanel";
+import CustomWidgets from "./components/CustomWidgets/CustomWidgets";
 
 const EarthMap = lazy(() => import("./components/Map/EarthMap"));
 
@@ -18,6 +20,7 @@ const ROW_MIN = 28; const ROW_MAX = 78;
 const ORB_MIN = 16; const ORB_MAX = 52;
 
 type DragKind = "col" | "row" | "orb";
+type Cell4Tab = "catalog" | "widgets";
 
 
 /** Thin interactive bar — drag to resize adjacent panels. */
@@ -54,6 +57,7 @@ export default function App() {
     viewMode, setViewMode, observer, setObserver,
   } = useAppStore();
 
+  const [cell4Tab, setCell4Tab] = useState<Cell4Tab>("catalog");
 
   // Panel split state — percentages
   const [colSplit, setColSplit] = useState(64);
@@ -145,9 +149,9 @@ export default function App() {
         {/* ── Cell 1: SKY / EARTH viewport ──────────────────────────────── */}
         <div style={{ minHeight: 0, minWidth: 0, overflow: "hidden", position: "relative" }}>
           <PanelFrame accent="red" className="w-full h-full relative overflow-hidden">
-            {/* SKY / EARTH toggle */}
+            {/* SKY / EARTH / TUBE toggle */}
             <div className="absolute top-3 left-10 flex gap-px" style={{ zIndex: 9999 }}>
-              {(["skyChart", "earthMap"] as const).map((m) => (
+              {(["skyChart", "earthMap", "youtube"] as const).map((m) => (
                 <button
                   key={m}
                   onClick={() => setViewMode(m)}
@@ -157,7 +161,7 @@ export default function App() {
                       : "bg-panel/90 text-dim hover:text-text border border-white/[0.08]"
                     }`}
                 >
-                  {m === "skyChart" ? "SKY" : "EARTH"}
+                  {m === "skyChart" ? "SKY" : m === "earthMap" ? "EARTH" : "TUBE"}
                 </button>
               ))}
             </div>
@@ -165,7 +169,7 @@ export default function App() {
             <div className="w-full h-full">
               {viewMode === "skyChart" ? (
                 <StellariumView />
-              ) : (
+              ) : viewMode === "earthMap" ? (
                 <Suspense fallback={
                   <div className="flex items-center justify-center h-full text-dim text-[calc(10px*var(--fs))] font-mono">
                     LOADING MAP…
@@ -173,6 +177,8 @@ export default function App() {
                 }>
                   <EarthMap />
                 </Suspense>
+              ) : (
+                <YouTubePanel />
               )}
             </div>
           </PanelFrame>
@@ -217,9 +223,27 @@ export default function App() {
           </div>
         </div>
 
-        {/* ── Cell 4: Object selector ───────────────────────────────────── */}
-        <div style={{ minHeight: 0, minWidth: 0, overflow: "hidden" }}>
-          <ObjectSelector />
+        {/* ── Cell 4: Catalog / Custom Widgets (tabbed) ─────────────────── */}
+        <div style={{ minHeight: 0, minWidth: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          {/* Tab bar */}
+          <div className="flex shrink-0 border-b border-white/[0.06]">
+            {(["catalog", "widgets"] as Cell4Tab[]).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setCell4Tab(tab)}
+                className={`px-4 py-1.5 text-[calc(8.5px*var(--fs))] font-mono uppercase tracking-widest transition-colors
+                  ${cell4Tab === tab
+                    ? "text-accent-red border-b-2 border-accent-red -mb-px"
+                    : "text-dim hover:text-text"
+                  }`}
+              >
+                {tab === "catalog" ? "CATALOG" : "WIDGETS"}
+              </button>
+            ))}
+          </div>
+          <div className="flex-1 min-h-0 overflow-hidden">
+            {cell4Tab === "catalog" ? <ObjectSelector /> : <CustomWidgets />}
+          </div>
         </div>
 
         {/* ── Column split handle ───────────────────────────────────────── */}

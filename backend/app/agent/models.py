@@ -189,6 +189,72 @@ class PythonExec(HALToolCall):
     code: str = Field(..., min_length=1, description="Python source to execute.")
 
 
+# ── Web / internet search ────────────────────────────────────────────────────
+
+
+class WebSearch(HALToolCall):
+    """Search the internet for current information: news, articles, science,
+    Wikipedia, etc.  Use when the user asks for something that requires
+    up-to-date facts, context from the web, or an explicit Wikipedia article."""
+
+    query: str = Field(..., description="Search query in the user's language.")
+    source: Literal["web", "wikipedia", "auto"] = Field(
+        "auto",
+        description=(
+            "'wikipedia' when the user explicitly asks for a Wikipedia article "
+            "or wants an encyclopedic explanation. "
+            "'web' for news, recent events, or any general internet search. "
+            "'auto' to let HAL decide."
+        ),
+    )
+
+
+# ── YouTube ───────────────────────────────────────────────────────────────────
+
+
+class YouTubeOpen(HALToolCall):
+    """Find and open a YouTube video (music, news, podcast, tutorial…).
+    Use when the user asks to play, listen to, or watch something on YouTube."""
+
+    query: str = Field(
+        ...,
+        description="Search terms for the YouTube video, e.g. 'lofi hip hop chill', 'SpaceX launch 2024'.",
+    )
+
+
+# ── Widget forge (creative playground) ───────────────────────────────────────
+
+
+class WidgetCreate(HALToolCall):
+    """Create a custom interactive widget (timer, counter, calculator, etc.)
+    and save it to the Custom Widgets panel.
+
+    Generate a complete, self-contained HTML document with:
+    - Inline <style> using the observatory dark theme:
+        body { background:#0a0a0f; color:#c8c8d0; font-family:monospace; margin:0; padding:12px; }
+        Buttons: background:#1a1a2e; color:#c8c8d0; border:1px solid #e84040/30; border-radius:4px; cursor:pointer;
+        Accent color for highlights: #e84040
+    - All JavaScript inline in a <script> tag at the end of <body>.
+    - No external resources (no CDN, no external fonts, no external scripts).
+    - Interactive controls matching the requested functionality.
+    """
+
+    name: str = Field(..., description="Short display name for the widget, e.g. 'Temporizador'.")
+    description: str = Field(
+        ...,
+        description="One sentence describing what the widget does.",
+    )
+    html_content: str = Field(
+        ...,
+        description=(
+            "Complete self-contained HTML document. Must start with <!DOCTYPE html> and "
+            "include all CSS in a <style> block and all JS in a <script> block. "
+            "Dark observatory theme: bg=#0a0a0f, text=#c8c8d0, accent=#e84040. "
+            "No external dependencies whatsoever."
+        ),
+    )
+
+
 # ── Discriminated union of every tool ────────────────────────────────────────
 
 
@@ -211,6 +277,9 @@ AnyToolCall = Union[
     CameraSequence,
     WeatherQuery,
     PythonExec,
+    WebSearch,
+    YouTubeOpen,
+    WidgetCreate,
 ]
 
 
@@ -221,6 +290,7 @@ ToolName = Literal[
     "tracking_feasibility",
     "camera_expose", "camera_sequence",
     "weather", "python_exec",
+    "web_search", "youtube_open", "widget_create",
 ]
 
 
@@ -316,6 +386,9 @@ TOOL_CATALOGUE: list[tuple[str, type[HALToolCall], str]] = [
     ("camera_sequence",             CameraSequence,            "Scheduled multi-frame exposure sequence."),
     ("weather",                     WeatherQuery,              "Current weather + seeing/transparency."),
     ("python_exec",                 PythonExec,                "Run arbitrary Python in the analysis kernel."),
+    ("web_search",                  WebSearch,                 "Search the internet or Wikipedia for current info."),
+    ("youtube_open",                YouTubeOpen,               "Find and open a YouTube video (music, news, podcast…)."),
+    ("widget_create",               WidgetCreate,              "Create an interactive custom widget and save it to the panel."),
 ]
 
 

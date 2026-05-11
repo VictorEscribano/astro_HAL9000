@@ -9,7 +9,8 @@ from fastapi.responses import FileResponse
 from pathlib import Path
 
 from app.services.cache import init_db
-from app.routers import sky, satellites, mount, chat, stel_proxy
+from app.routers import sky, satellites, mount, chat, stel_proxy, widgets
+from app.config import get_settings
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,6 +24,7 @@ log = logging.getLogger("astroagent")
 async def lifespan(app: FastAPI):
     await init_db()
     asyncio.create_task(_warm_ephemeris())
+    asyncio.create_task(_log_model_info())
     yield
 
 
@@ -33,6 +35,19 @@ async def _warm_ephemeris():
         log.info("Ephemeris loaded (DE421)")
     except Exception as e:
         log.warning("Ephemeris load failed: %s", e)
+
+
+async def _log_model_info():
+    """Log the active LLM configuration and Pareto recommendation at startup."""
+    try:
+        from app.services.model_registry import pareto_table, recommend
+        s = get_settings()
+        log.info("LLM backend: %s", s.llm_backend)
+        if s.model_profile:
+            log.info("Model profile: %s", s.model_profile)
+        log.info("CPU model Pareto table:\n%s", pareto_table())
+    except Exception as e:
+        log.debug("Model registry log failed: %s", e)
 
 
 app = FastAPI(
@@ -60,6 +75,29 @@ app.include_router(satellites.router)
 app.include_router(mount.router)
 app.include_router(chat.router)
 app.include_router(stel_proxy.router)   # must be before SPA catch-all
+app.include_router(widgets.router)
+
+# ── CPU LLM backends (dev_cpu_llms branch) ───────────────────────────────────
+_s = get_settings()
+
+if _s.llm_backend == "llamacpp":
+    from app.agent.backends.llamacpp_embed import build_llama_app
+    _threads = _s.llamacpp_n_threads or None
+    _llama_sub = build_llama_app(
+        _s.llamacpp_model_path,
+        n_ctx=_s.llamacpp_n_ctx,
+        n_threads=_threads,
+    )
+    if _llama_sub:
+        app.mount("/api/llm", _llama_sub)
+        log.info("llama-cpp sub-app mounted at /api/llm")
+    else:
+        log.error("llamacpp backend configured but model could not be loaded.")
+
+elif _s.llm_backend == "onnx":
+    from app.routers.onnx_chat import router as onnx_router
+    app.include_router(onnx_router)
+    log.info("ONNX chat router mounted at /api/onnx/v1")
 
 # Serve React frontend in production (MUST be last — catch-all)
 FRONTEND_DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
