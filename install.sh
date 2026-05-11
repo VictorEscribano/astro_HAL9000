@@ -204,9 +204,11 @@ qwen3-1.7b)
         ok "Modelo ya descargado: $MODEL_FILE"
     else
         info "Descargando Qwen3-1.7B Q8_0 (~1.8 GB)..."
-        "$HF_CLI" download Qwen/Qwen3-1.7B-GGUF \
-            Qwen3-1.7B-Q8_0.gguf \
-            --local-dir "$MODELS_DIR"
+        "$PY" -c "
+from huggingface_hub import hf_hub_download
+hf_hub_download('Qwen/Qwen3-1.7B-GGUF', 'Qwen3-1.7B-Q8_0.gguf', local_dir='$MODELS_DIR')
+print('Descarga completa')
+"
         ok "Qwen3-1.7B descargado"
     fi
     ENV_LLM="LLM_BACKEND=llamacpp
@@ -220,9 +222,11 @@ qwen3-4b)
         ok "Modelo ya descargado: $MODEL_FILE"
     else
         info "Descargando Qwen3-4B Q4_K_M (~2.5 GB)..."
-        "$HF_CLI" download Qwen/Qwen3-4B-GGUF \
-            Qwen3-4B-Q4_K_M.gguf \
-            --local-dir "$MODELS_DIR"
+        "$PY" -c "
+from huggingface_hub import hf_hub_download
+hf_hub_download('Qwen/Qwen3-4B-GGUF', 'Qwen3-4B-Q4_K_M.gguf', local_dir='$MODELS_DIR')
+print('Descarga completa')
+"
         ok "Qwen3-4B descargado"
     fi
     ENV_LLM="LLM_BACKEND=llamacpp
@@ -245,9 +249,13 @@ astrosage-8b)
         fi
         info "Descargando AstroSage-8B Q4_K_M (~5 GB)..."
         info "→ Especialista en astronomía (paridad GPT-4o en AstroMLab-1)"
-        HF_TOKEN="$HF_TOKEN" "$HF_CLI" download AstroMLab/AstroSage-LLaMA-3.1-8B-GGUF \
-            AstroSage-LLaMA-3.1-8B-Q4_K_M.gguf \
-            --local-dir "$MODELS_DIR"
+        HF_TOKEN="${HF_TOKEN:-}" "$PY" -c "
+import os
+from huggingface_hub import hf_hub_download
+hf_hub_download('AstroMLab/AstroSage-LLaMA-3.1-8B-GGUF', 'AstroSage-LLaMA-3.1-8B-Q4_K_M.gguf',
+    local_dir='$MODELS_DIR', token=os.environ.get('HF_TOKEN'))
+print('Descarga completa')
+"
         ok "AstroSage-8B descargado"
     fi
     ENV_LLM="LLM_BACKEND=llamacpp
@@ -262,9 +270,11 @@ qwen3-8b)
         ok "Modelo ya descargado: $MODEL_FILE"
     else
         info "Descargando Qwen3-8B Q4_K_M (~5 GB)..."
-        "$HF_CLI" download Qwen/Qwen3-8B-GGUF \
-            Qwen3-8B-Q4_K_M.gguf \
-            --local-dir "$MODELS_DIR"
+        "$PY" -c "
+from huggingface_hub import hf_hub_download
+hf_hub_download('Qwen/Qwen3-8B-GGUF', 'Qwen3-8B-Q4_K_M.gguf', local_dir='$MODELS_DIR')
+print('Descarga completa')
+"
         ok "Qwen3-8B descargado"
     fi
     ENV_LLM="LLM_BACKEND=llamacpp
@@ -280,9 +290,11 @@ qwen3-30b-moe)
     else
         info "Descargando Qwen3-30B-A3B Q4_K_M (~8.5 GB)..."
         info "→ MoE: 30B parámetros totales, 3B activos por token"
-        "$HF_CLI" download Qwen/Qwen3-30B-A3B-GGUF \
-            Qwen3-30B-A3B-Q4_K_M.gguf \
-            --local-dir "$MODELS_DIR"
+        "$PY" -c "
+from huggingface_hub import hf_hub_download
+hf_hub_download('Qwen/Qwen3-30B-A3B-GGUF', 'Qwen3-30B-A3B-Q4_K_M.gguf', local_dir='$MODELS_DIR')
+print('Descarga completa')
+"
         ok "Qwen3-30B-A3B descargado"
     fi
     ENV_LLM="LLM_BACKEND=llamacpp
@@ -304,9 +316,13 @@ qwen3-30b-moe-abliterated)
             die "Token HF_TOKEN no encontrado. Abortando."
         fi
         info "Descargando Qwen3-30B-A3B abliterated Q4_K_M (~8.5 GB, huihui-ai)..."
-        HF_TOKEN="$HF_TOKEN" "$HF_CLI" download huihui-ai/Qwen3-30B-A3B-abliterated-GGUF \
-            "Qwen3-30B-A3B-abliterated-Q4_K_M.gguf" \
-            --local-dir "$MODELS_DIR"
+        HF_TOKEN="${HF_TOKEN:-}" "$PY" -c "
+import os
+from huggingface_hub import hf_hub_download
+hf_hub_download('huihui-ai/Qwen3-30B-A3B-abliterated-GGUF', 'Qwen3-30B-A3B-abliterated-Q4_K_M.gguf',
+    local_dir='$MODELS_DIR', token=os.environ.get('HF_TOKEN'))
+print('Descarga completa')
+"
         ok "Qwen3-30B-A3B abliterated descargado"
     fi
     ENV_LLM="LLM_BACKEND=llamacpp
