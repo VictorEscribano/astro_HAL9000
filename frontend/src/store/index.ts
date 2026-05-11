@@ -47,6 +47,7 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   toolCalls?: ToolCall[];
+  sources?: WebSource[];
 }
 
 export interface ToolCall {
@@ -96,6 +97,26 @@ export interface InfoCard {
   image_url?: string;
 }
 
+export interface WebSource {
+  title: string;
+  url: string;
+  snippet?: string;
+}
+
+export interface YouTubeVideo {
+  video_id: string;
+  title: string;
+  embed_url: string;
+  url: string;
+}
+
+export interface CustomWidget {
+  id: string;
+  name: string;
+  description: string;
+  created_at: number;
+}
+
 export type FontSize = "xs" | "sm" | "md" | "lg";
 export type ThemeAccent = "red" | "blue" | "green";
 
@@ -117,15 +138,15 @@ interface AppState {
   selectedTarget: SelectedTarget | null;
   setSelectedTarget: (t: SelectedTarget | null) => void;
 
-  viewMode: "skyChart" | "earthMap";
-  setViewMode: (m: "skyChart" | "earthMap") => void;
+  viewMode: "skyChart" | "earthMap" | "youtube";
+  setViewMode: (m: "skyChart" | "earthMap" | "youtube") => void;
 
   mountStatus: MountStatus | null;
   setMountStatus: (s: MountStatus) => void;
 
   messages: ChatMessage[];
   addMessage: (m: ChatMessage) => void;
-  updateLastMessage: (content: string, toolCalls?: ToolCall[]) => void;
+  updateLastMessage: (content: string, toolCalls?: ToolCall[], sources?: WebSource[]) => void;
   clearMessages: () => void;
 
   ollamaOnline: boolean;
@@ -142,6 +163,17 @@ interface AppState {
 
   stelSelection: StelSelection | null;
   setStelSelection: (s: StelSelection | null) => void;
+
+  youtubeVideo: YouTubeVideo | null;
+  setYoutubeVideo: (v: YouTubeVideo | null) => void;
+
+  customWidgets: CustomWidget[];
+  setCustomWidgets: (w: CustomWidget[]) => void;
+  addCustomWidget: (w: CustomWidget) => void;
+  removeCustomWidget: (id: string) => void;
+
+  pendingSources: WebSource[];
+  setPendingSources: (s: WebSource[]) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -175,7 +207,7 @@ export const useAppStore = create<AppState>((set) => ({
   messages: [],
   addMessage: (m) => set((state) => ({ messages: [...state.messages, m] })),
   clearMessages: () => set({ messages: [] }),
-  updateLastMessage: (content, toolCalls) =>
+  updateLastMessage: (content, toolCalls, sources) =>
     set((state) => {
       const msgs = [...state.messages];
       const last = msgs[msgs.length - 1];
@@ -184,6 +216,7 @@ export const useAppStore = create<AppState>((set) => ({
           ...last,
           content,
           toolCalls: toolCalls ?? last.toolCalls,
+          sources: sources ?? last.sources,
         };
       }
       return { messages: msgs };
@@ -203,4 +236,15 @@ export const useAppStore = create<AppState>((set) => ({
 
   stelSelection: null,
   setStelSelection: (s) => set({ stelSelection: s }),
+
+  youtubeVideo: null,
+  setYoutubeVideo: (v) => set({ youtubeVideo: v }),
+
+  customWidgets: [],
+  setCustomWidgets: (w) => set({ customWidgets: w }),
+  addCustomWidget: (w) => set((s) => ({ customWidgets: [...s.customWidgets, w] })),
+  removeCustomWidget: (id) => set((s) => ({ customWidgets: s.customWidgets.filter((w) => w.id !== id) })),
+
+  pendingSources: [],
+  setPendingSources: (s) => set({ pendingSources: s }),
 }));

@@ -1,8 +1,44 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useAppStore, ChatMessage, ToolCall } from "../../store";
+import { useAppStore, ChatMessage, ToolCall, WebSource } from "../../store";
 import { CHAT_STREAM_URL } from "../../api";
 import ToolCallCard from "./ToolCallCard";
 import PanelFrame from "../ui/PanelFrame";
+
+// Render text with markdown links: [title](url) → <a>
+function TextWithLinks({ text }: { text: string }) {
+  const parts: React.ReactNode[] = [];
+  const linkRe = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+  let last = 0, m: RegExpExecArray | null;
+  while ((m = linkRe.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    parts.push(
+      <a key={m.index} href={m[2]} target="_blank" rel="noreferrer"
+        className="text-accent-red/80 hover:text-accent-red underline underline-offset-2 transition-colors">
+        {m[1]}
+      </a>
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return <>{parts}</>;
+}
+
+// Sources footer rendered below an assistant message
+function SourcesBar({ sources }: { sources: WebSource[] }) {
+  if (!sources.length) return null;
+  return (
+    <div className="mt-1.5 pt-1.5 border-t border-white/[0.06] flex flex-wrap gap-x-3 gap-y-0.5">
+      <span className="text-[calc(7.5px*var(--fs))] font-mono text-dim/50 tracking-widest uppercase">Fuentes:</span>
+      {sources.map((s, i) => (
+        <a key={i} href={s.url} target="_blank" rel="noreferrer"
+          title={s.snippet}
+          className="text-[calc(7.5px*var(--fs))] font-mono text-accent-red/60 hover:text-accent-red transition-colors underline underline-offset-2 truncate max-w-[200px]">
+          {s.title || s.url}
+        </a>
+      ))}
+    </div>
+  );
+}
 
 // ── Voice / TTS ────────────────────────────────────────────────────────────
 function useTTS() {
@@ -119,6 +155,7 @@ export default function Chat() {
   const {
     messages, addMessage, updateLastMessage, clearMessages,
     ollamaOnline, setSelectedTarget, setViewMode, setGroundTrack, setSkyObjects, setInfoCard,
+    setYoutubeVideo, addCustomWidget, setPendingSources,
   } = useAppStore();
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -167,6 +204,7 @@ export default function Chat() {
     let currentContent = "";
     let toolCalls: ToolCall[] = [];
     let pendingTool: Partial<ToolCall> | null = null;
+    let collectedSources: WebSource[] = [];
 
     try {
       const resp = await fetch(CHAT_STREAM_URL, {
@@ -210,6 +248,9 @@ export default function Chat() {
                   handleToolOutput(tc);
                 }
               } else if (ev.type === "ui_command") {
+                if (ev.action === "show_sources" && Array.isArray(ev.sources)) {
+                  collectedSources = [...collectedSources, ...ev.sources];
+                }
                 handleUICommand(ev);
               } else if (ev.type === "error") {
                 currentContent += `\n⚠ ${ev.message}`;
@@ -223,7 +264,10 @@ export default function Chat() {
       updateLastMessage(`⚠ ${String(err)}`);
     } finally {
       setLoading(false);
-      // Speak the final response if voice enabled
+      if (collectedSources.length > 0) {
+        updateLastMessage(currentContent, toolCalls, collectedSources);
+        setPendingSources([]);
+      }
       if (currentContent.trim()) tts.speak(currentContent);
     }
   }
@@ -255,6 +299,32 @@ export default function Chat() {
         break;
       case "refresh_sky_objects":
         import("../../api").then(({ api }) => api.skyObjectsTonight().then(setSkyObjects).catch(() => {}));
+        break;
+      case "open_youtube":
+        if (cmd.video_id) {
+          setYoutubeVideo({
+            video_id: cmd.video_id,
+            title: cmd.title || cmd.video_id,
+            embed_url: cmd.embed_url,
+            url: cmd.url,
+          });
+          setViewMode("youtube");
+        }
+        break;
+      case "show_sources":
+        if (Array.isArray(cmd.sources)) {
+          setPendingSources(cmd.sources);
+        }
+        break;
+      case "new_widget":
+        if (cmd.widget_id) {
+          addCustomWidget({
+            id: cmd.widget_id,
+            name: cmd.name || "Widget",
+            description: "",
+            created_at: Date.now() / 1000,
+          });
+        }
         break;
     }
   }
@@ -361,9 +431,12 @@ export default function Chat() {
                   )}
                   {msg.content ? (
                     <div className="text-[calc(11px*var(--fs))] font-mono text-text/80 leading-relaxed pl-3 border-l border-accent-red/20 whitespace-pre-wrap">
-                      {msg.content}
+                      <TextWithLinks text={msg.content} />
                       {loading && msg === lastMsg && (
                         <span className="inline-block w-1.5 h-3 bg-accent-red ml-0.5 animate-pulse align-text-bottom" />
+                      )}
+                      {msg.sources && msg.sources.length > 0 && (
+                        <SourcesBar sources={msg.sources} />
                       )}
                     </div>
                   ) : (

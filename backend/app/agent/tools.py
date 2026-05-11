@@ -43,6 +43,9 @@ from app.agent.models import (
     ToolSelection,
     TrackingFeasibilityCheck,
     WeatherQuery,
+    WebSearch,
+    YouTubeOpen,
+    WidgetCreate,
     tool_list_for_prompt,
 )
 from app.agent.prompts import INTENT_CLASSIFIER_PROMPT, TOOL_EXTRACTION_PROMPT
@@ -456,7 +459,50 @@ async def execute_tool(call: HALToolCall) -> ToolResult:
         except Exception as e:
             return _err("python_exec", str(e))
 
+    # Web / Wikipedia search ──────────────────────────────────────────────────
+    if isinstance(call, WebSearch):
+        from app.tools.web import find_youtube_video, search_web, search_wikipedia
+        try:
+            source = call.source
+            if source == "wikipedia" or (source == "auto" and _looks_like_wiki(call.query)):
+                result = await search_wikipedia(call.query)
+                if "error" not in result:
+                    return _ok("web_search", {"source": "wikipedia", "results": [result]})
+                # fall through to web search on wiki failure
+            results = await search_web(call.query, max_results=5)
+            return _ok("web_search", {"source": "web", "results": results})
+        except Exception as e:
+            return _err("web_search", str(e))
+
+    # YouTube ──────────────────────────────────────────────────────────────────
+    if isinstance(call, YouTubeOpen):
+        from app.tools.web import find_youtube_video
+        try:
+            result = await find_youtube_video(call.query)
+            if "error" in result:
+                return _err("youtube_open", result["error"])
+            return _ok("youtube_open", result)
+        except Exception as e:
+            return _err("youtube_open", str(e))
+
+    # Widget forge ────────────────────────────────────────────────────────────
+    if isinstance(call, WidgetCreate):
+        from app.tools.widget_forge import save_widget
+        try:
+            record = save_widget(call.name, call.description, call.html_content)
+            return _ok("widget_create", record)
+        except Exception as e:
+            return _err("widget_create", str(e))
+
     return _err(tool_name, f"Sin dispatcher para {tool_name}.")
+
+
+def _looks_like_wiki(query: str) -> bool:
+    """Heuristic: does this query look like it wants a Wikipedia article?"""
+    wiki_keywords = {"qué es", "what is", "who is", "quién es", "historia de",
+                     "definición", "definition", "wikipedia", "enciclopedia"}
+    q = query.lower()
+    return any(kw in q for kw in wiki_keywords)
 
 
 # ── Frontend UI commands derived from tool results ───────────────────────────
@@ -495,5 +541,28 @@ def ui_command_from_result(call: HALToolCall, result: ToolResult) -> dict | None
 
     if isinstance(call, (MountGoto, MountTrack, MountPark, MountAbort)):
         return {"action": "mount_command", "result": result.result}
+
+    if isinstance(call, YouTubeOpen) and isinstance(result.result, dict):
+        d = result.result
+        return {
+            "action": "open_youtube",
+            "video_id": d.get("video_id"),
+            "title": d.get("title"),
+            "embed_url": d.get("embed_url"),
+            "url": d.get("url"),
+        }
+
+    if isinstance(call, WebSearch) and isinstance(result.result, dict):
+        sources = result.result.get("results", [])
+        if sources:
+            return {"action": "show_sources", "sources": sources}
+
+    if isinstance(call, WidgetCreate) and isinstance(result.result, dict):
+        d = result.result
+        return {
+            "action": "new_widget",
+            "widget_id": d.get("id"),
+            "name": d.get("name"),
+        }
 
     return None

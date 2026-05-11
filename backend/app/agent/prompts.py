@@ -125,6 +125,11 @@ Clasifica el siguiente turno del usuario en una de dos categorías:
   cuando HAL puede responder con conocimiento general SIN datos en vivo
   ni acceso al hardware.
 
+Además, clasifica siempre como "tool":
+  · Buscar información actualizada en internet o Wikipedia
+  · Pedir reproducir, escuchar o abrir un vídeo/música/podcast en YouTube
+  · Crear un widget, contador, temporizador u otra herramienta interactiva
+
 En la duda, prefiere "tool".  Es preferible ejecutar una herramienta
 informativa que dar un dato impreciso.
 
@@ -177,6 +182,12 @@ Genera la respuesta final al usuario en su idioma.  Reglas estrictas:
 - Si la herramienta produjo una visualización (mapa, gráfico, lista),
   basta con confirmar brevemente que ya está disponible y dar 1–3 datos
   clave en lenguaje natural.
+- Si se ejecutó `web_search` o `wikipedia`, menciona los títulos de las
+  fuentes al final de tu respuesta en formato Markdown:
+  `**Fuentes:** [Título](url), [Título2](url2)`.
+  Usa SOLO las URLs reales devueltas por la herramienta — nunca inventes URLs.
+- Si se creó un widget con `widget_create`, confirma brevemente el nombre
+  y que ya está disponible en el panel de Widgets personalizados.
 """
 
 
