@@ -87,19 +87,51 @@ def _format_history_tail(history: list[dict] | None, max_turns: int = 4) -> str:
     return "Contexto reciente de la conversación:\n" + "\n".join(lines) + "\n\n"
 
 
+_CONV_KEYWORDS = {
+    "hola", "hi", "hello", "hey", "buenas", "buenos", "gracias", "thank", "thanks",
+    "ok", "vale", "genial", "perfecto", "cool", "adiós", "bye", "adios",
+    "qué es", "que es", "qué son", "cuéntame", "cuentame", "explícame", "explicame",
+    "what is", "tell me about", "explain",
+}
+
+
+def _fast_conv_check(msg: str) -> bool:
+    """Return True if the message is obviously conversational (no tool needed).
+    Bypasses the LLM call entirely to save CPU time."""
+    low = msg.lower().strip()
+    # Short greetings / single words
+    if len(low.split()) <= 2 and any(kw in low for kw in _CONV_KEYWORDS):
+        return True
+    # No action verbs or hardware keywords → likely conversation
+    action_hints = {"mueve", "apunta", "goto", "park", "sigue", "track", "expón",
+                    "busca", "satellite", "iss", "clima", "weather", "visible",
+                    "foto", "imagen", "graba", "abre youtube", "crea widget",
+                    "move", "point", "expose", "search", "show"}
+    if not any(h in low for h in action_hints) and len(low.split()) <= 6:
+        return True
+    return False
+
+
 async def classify_intent(user_message: str, history: list[dict] | None = None) -> Intent:
     """Decide whether this turn needs a tool or is conversation.  Runs as a
-    blocking openai call wrapped in a thread to keep the event loop free."""
+    blocking openai call wrapped in a thread to keep the event loop free.
+    For CPU backends a keyword fast-path is applied first to skip the LLM."""
     s = get_settings()
+
+    if s.llm_backend in ("llamacpp", "onnx") and _fast_conv_check(user_message):
+        return Intent(intent="conversation", rationale="keyword fast-path")
+
     history_block = _format_history_tail(history)
     prompt = history_block + INTENT_CLASSIFIER_PROMPT.format(user_message=user_message)
+    max_retries = 1 if s.llm_backend in ("llamacpp", "onnx") else 2
 
     def _call():
         return client().chat.completions.create(
             model=get_active_model_name(),
             response_model=Intent,
             temperature=0.1,
-            max_retries=2,
+            max_retries=max_retries,
+            max_tokens=80,
             messages=[
                 {"role": "system",
                  "content": (
@@ -123,12 +155,15 @@ async def make_plan(user_message: str, history: list[dict] | None = None) -> Pla
     tool_list = tool_list_for_prompt()
     history_block = _format_history_tail(history)
 
+    max_retries = 1 if get_settings().llm_backend in ("llamacpp", "onnx") else 2
+
     def _call():
         return client().chat.completions.create(
             model=get_active_model_name(),
             response_model=Plan,
             temperature=0.1,
-            max_retries=2,
+            max_retries=max_retries,
+            max_tokens=120,
             messages=[
                 {"role": "system",
                  "content": (
@@ -208,12 +243,15 @@ async def extract_tool_args(
     if prev_error:
         err_block = f"El intento anterior falló con: {prev_error}\nCorrige los argumentos.\n\n"
 
+    max_retries = 1 if s.llm_backend in ("llamacpp", "onnx") else 2
+
     def _call():
         return client().chat.completions.create(
             model=get_active_model_name(),
             response_model=schema,
             temperature=0.1,
-            max_retries=2,
+            max_retries=max_retries,
+            max_tokens=150,
             messages=[
                 {"role": "system",
                  "content": (
