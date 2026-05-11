@@ -58,7 +58,7 @@ ONNX_MODEL_PATH=$MODELS_DIR/phi4mini-onnx/cpu-int4-rtn-block-32"
 qwen3-1.7b)
     echo "[*] Downloading Qwen3-1.7B Q4_K_M..."
     echo "    ~1.2 GB · backend: llamacpp · ~18 tok/s"
-    huggingface-cli download Qwen/Qwen3-1.7B-GGUF \
+    hf download Qwen/Qwen3-1.7B-GGUF \
         qwen3-1.7b-q4_k_m.gguf \
         --local-dir "$MODELS_DIR"
 
@@ -72,7 +72,7 @@ LLAMACPP_N_CTX=32768"
 qwen3-4b)
     echo "[*] Downloading Qwen3-4B Q4_K_M (recommended default)..."
     echo "    ~2.5 GB · backend: llamacpp · ~10 tok/s · thinking mode"
-    huggingface-cli download Qwen/Qwen3-4B-GGUF \
+    hf download Qwen/Qwen3-4B-GGUF \
         qwen3-4b-q4_k_m.gguf \
         --local-dir "$MODELS_DIR"
 
@@ -87,7 +87,7 @@ astrosage-8b)
     echo "[*] Downloading AstroSage-LLaMA-3.1-8B Q4_K_M..."
     echo "    ~5 GB · backend: llamacpp · ~6 tok/s"
     echo "    → GPT-4o parity on AstroMLab-1 astronomy benchmark"
-    huggingface-cli download AstroMLab/AstroSage-LLaMA-3.1-8B-GGUF \
+    hf download AstroMLab/AstroSage-LLaMA-3.1-8B-GGUF \
         AstroSage-LLaMA-3.1-8B-Q4_K_M.gguf \
         --local-dir "$MODELS_DIR"
 
@@ -102,7 +102,7 @@ qwen3-30b-moe)
     echo "[*] Downloading Qwen3-30B-A3B Q4_K_M (MoE)..."
     echo "    ~8.5 GB · backend: llamacpp · ~8 tok/s"
     echo "    → 30B total params, 3B active — quality of 30B at 3B speed"
-    huggingface-cli download Qwen/Qwen3-30B-A3B-GGUF \
+    hf download Qwen/Qwen3-30B-A3B-GGUF \
         qwen3-30b-a3b-q4_k_m.gguf \
         --local-dir "$MODELS_DIR"
 
@@ -117,7 +117,7 @@ qwen3-30b-moe-abliterated)
     echo "[*] Downloading Qwen3-30B-A3B abliterated Q4_K_M (huihui-ai)..."
     echo "    ~8.5 GB · backend: llamacpp · ~8 tok/s"
     echo "    → Uncensored MoE variant from huihui-ai"
-    huggingface-cli download huihui-ai/Qwen3-30B-A3B-abliterated-GGUF \
+    hf download huihui-ai/Qwen3-30B-A3B-abliterated-GGUF \
         "Qwen3-30B-A3B-abliterated-Q4_K_M.gguf" \
         --local-dir "$MODELS_DIR"
 
@@ -131,7 +131,7 @@ LLAMACPP_N_CTX=131072"
 qwen3-8b)
     echo "[*] Downloading Qwen3-8B Q4_K_M..."
     echo "    ~5 GB · backend: llamacpp · ~5.5 tok/s · thinking mode"
-    huggingface-cli download Qwen/Qwen3-8B-GGUF \
+    hf download Qwen/Qwen3-8B-GGUF \
         qwen3-8b-q4_k_m.gguf \
         --local-dir "$MODELS_DIR"
 

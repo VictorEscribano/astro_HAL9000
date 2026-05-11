@@ -171,7 +171,7 @@ ok "huggingface-hub instalado"
 step "Descarga del modelo LLM"
 
 mkdir -p "$MODELS_DIR"
-HF_CLI="$VENV/bin/huggingface-cli"
+HF_CLI="$VENV/bin/hf"
 
 case "$PROFILE" in
 

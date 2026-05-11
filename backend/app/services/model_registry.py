@@ -69,7 +69,7 @@ REGISTRY: list[ModelProfile] = [
         notes="Microsoft's Phi-4-mini in ONNX INT4. Fastest option; excellent reasoning. "
               "onnxruntime-genai delivers ~5-12x speedup over vanilla PyTorch on CPU.",
         download_cmd=(
-            "huggingface-cli download microsoft/Phi-4-mini-instruct-onnx "
+            "hf download microsoft/Phi-4-mini-instruct-onnx "
             "--include 'cpu-int4-rtn-block-32/*' "
             "--local-dir models/phi4mini-onnx"
         ),
@@ -92,7 +92,7 @@ REGISTRY: list[ModelProfile] = [
         astronomy_specialist=False,
         notes="Ultra-fast. Thinking mode already supported by HAL's <think> stripper.",
         download_cmd=(
-            "huggingface-cli download Qwen/Qwen3-1.7B-GGUF "
+            "hf download Qwen/Qwen3-1.7B-GGUF "
             "qwen3-1.7b-q4_k_m.gguf --local-dir models/"
         ),
     ),
@@ -116,7 +116,7 @@ REGISTRY: list[ModelProfile] = [
         astronomy_specialist=False,
         notes="Best all-round Pareto point. Strong reasoning + thinking mode + Spanish.",
         download_cmd=(
-            "huggingface-cli download Qwen/Qwen3-4B-GGUF "
+            "hf download Qwen/Qwen3-4B-GGUF "
             "qwen3-4b-q4_k_m.gguf --local-dir models/"
         ),
     ),
@@ -139,7 +139,7 @@ REGISTRY: list[ModelProfile] = [
         notes="Fine-tuned on astronomy literature. Scores at GPT-4o level on AstroMLab-1 "
               "benchmark (80.9%). Best domain accuracy for HAL9000.",
         download_cmd=(
-            "huggingface-cli download AstroMLab/AstroSage-LLaMA-3.1-8B-GGUF "
+            "hf download AstroMLab/AstroSage-LLaMA-3.1-8B-GGUF "
             "AstroSage-LLaMA-3.1-8B-Q4_K_M.gguf --local-dir models/"
         ),
     ),
@@ -165,7 +165,7 @@ REGISTRY: list[ModelProfile] = [
               "Speed of a 3B model with quality of a 30B. SOTA Pareto point. "
               "Abliterated (uncensored) variant: huihui-ai/Qwen3-30B-A3B-abliterated-GGUF",
         download_cmd=(
-            "huggingface-cli download Qwen/Qwen3-30B-A3B-GGUF "
+            "hf download Qwen/Qwen3-30B-A3B-GGUF "
             "qwen3-30b-a3b-q4_k_m.gguf --local-dir models/"
         ),
     ),
@@ -189,7 +189,7 @@ REGISTRY: list[ModelProfile] = [
               "Removes refusals without degrading accuracy. Ideal for observatory "
               "technical queries where model alignment might block edge-case commands.",
         download_cmd=(
-            "huggingface-cli download huihui-ai/Qwen3-30B-A3B-abliterated-GGUF "
+            "hf download huihui-ai/Qwen3-30B-A3B-abliterated-GGUF "
             "Qwen3-30B-A3B-abliterated-Q4_K_M.gguf --local-dir models/"
         ),
     ),
@@ -211,7 +211,7 @@ REGISTRY: list[ModelProfile] = [
         astronomy_specialist=False,
         notes="Dense 8B, thinking mode, multilingual. Strong reasoning.",
         download_cmd=(
-            "huggingface-cli download Qwen/Qwen3-8B-GGUF "
+            "hf download Qwen/Qwen3-8B-GGUF "
             "qwen3-8b-q4_k_m.gguf --local-dir models/"
         ),
     ),
