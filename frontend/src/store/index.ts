@@ -187,8 +187,19 @@ interface AppState {
   llmPrefs: { backend: string; model_hint: string; thinking: boolean; language: string };
   /** Voice-related preferences persisted with the user profile. */
   voicePrefs: { voice: string; speed: number; enabled: boolean };
+  /** Power-user knobs that get exported as env vars on next start.
+   *  Most require a backend restart to take effect — the Advanced tab
+   *  shows a hint about this. */
+  advancedPrefs: {
+    whisper: { model: string; compute_type: string; device: string };
+    ik_llama: { ctx: number; threads: number; parallel: number; ngl: number; moe_cpu: boolean; moe_cpu_from: number };
+    secrets: { tavily_api_key: string; n2yo_api_key: string };
+  };
   setLlmPrefs: (p: Partial<{ backend: string; model_hint: string; thinking: boolean; language: string }>) => void;
   setVoicePrefs: (p: Partial<{ voice: string; speed: number; enabled: boolean }>) => void;
+  setAdvancedWhisper: (p: Partial<{ model: string; compute_type: string; device: string }>) => void;
+  setAdvancedIkLlama: (p: Partial<{ ctx: number; threads: number; parallel: number; ngl: number; moe_cpu: boolean; moe_cpu_from: number }>) => void;
+  setAdvancedSecrets: (p: Partial<{ tavily_api_key: string; n2yo_api_key: string }>) => void;
   setCurrentUser: (u: string | null) => void;
   setKnownUsers: (u: string[]) => void;
   /** Replace the whole settings block from a fetched profile.  Called on
@@ -198,6 +209,11 @@ interface AppState {
     session?: { observer?: Observer };
     llm?: { backend?: string; model_hint?: string; thinking?: boolean; language?: string };
     voice?: { voice?: string; speed?: number; enabled?: boolean };
+    advanced?: {
+      whisper?: { model?: string; compute_type?: string; device?: string };
+      ik_llama?: { ctx?: number; threads?: number; parallel?: number; ngl?: number; moe_cpu?: boolean; moe_cpu_from?: number };
+      secrets?: { tavily_api_key?: string; n2yo_api_key?: string };
+    };
   }) => void;
 }
 
@@ -276,8 +292,22 @@ export const useAppStore = create<AppState>((set) => ({
   knownUsers: [],
   llmPrefs: { backend: "ik_llama", model_hint: "4b", thinking: true, language: "es" },
   voicePrefs: { voice: "ef_dora", speed: 0.9, enabled: false },
+  advancedPrefs: {
+    whisper: { model: "small", compute_type: "int8", device: "cpu" },
+    ik_llama: { ctx: 8192, threads: 0, parallel: 1, ngl: 999, moe_cpu: true, moe_cpu_from: 14 },
+    secrets: { tavily_api_key: "", n2yo_api_key: "" },
+  },
   setLlmPrefs: (p) => set((s) => ({ llmPrefs: { ...s.llmPrefs, ...p } })),
   setVoicePrefs: (p) => set((s) => ({ voicePrefs: { ...s.voicePrefs, ...p } })),
+  setAdvancedWhisper: (p) => set((s) => ({
+    advancedPrefs: { ...s.advancedPrefs, whisper: { ...s.advancedPrefs.whisper, ...p } },
+  })),
+  setAdvancedIkLlama: (p) => set((s) => ({
+    advancedPrefs: { ...s.advancedPrefs, ik_llama: { ...s.advancedPrefs.ik_llama, ...p } },
+  })),
+  setAdvancedSecrets: (p) => set((s) => ({
+    advancedPrefs: { ...s.advancedPrefs, secrets: { ...s.advancedPrefs.secrets, ...p } },
+  })),
   setCurrentUser: (u) => set({ currentUser: u }),
   setKnownUsers: (u) => set({ knownUsers: u }),
   applyProfile: (p) => set((s) => ({
@@ -286,5 +316,10 @@ export const useAppStore = create<AppState>((set) => ({
     observer: p.session?.observer ?? s.observer,
     llmPrefs: { ...s.llmPrefs, ...(p.llm ?? {}) },
     voicePrefs: { ...s.voicePrefs, ...(p.voice ?? {}) },
+    advancedPrefs: {
+      whisper:  { ...s.advancedPrefs.whisper,  ...(p.advanced?.whisper  ?? {}) },
+      ik_llama: { ...s.advancedPrefs.ik_llama, ...(p.advanced?.ik_llama ?? {}) },
+      secrets:  { ...s.advancedPrefs.secrets,  ...(p.advanced?.secrets  ?? {}) },
+    },
   })),
 }));

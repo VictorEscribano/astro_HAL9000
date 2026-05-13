@@ -24,12 +24,13 @@ class SetActiveRequest(BaseModel):
 
 class UpdateRequest(BaseModel):
     """Loose schema — the client sends whatever subsections it edited
-    (appearance, session, llm, voice) and the service merges them in.
-    Extra keys are accepted to make schema evolution painless."""
+    (appearance, session, llm, voice, advanced) and the service merges
+    them in.  Extra keys are accepted to make schema evolution painless."""
     appearance: dict | None = None
     session: dict | None = None
     llm: dict | None = None
     voice: dict | None = None
+    advanced: dict | None = None
 
     model_config = {"extra": "allow"}
 

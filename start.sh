@@ -75,6 +75,9 @@ try:
     d = json.load(open(sys.argv[1]))
 except Exception:
     sys.exit(0)
+
+# Basic LLM hints (model + thinking).  Always exported because they're
+# always sensible defaults even on a brand-new profile.
 llm = d.get("llm", {}) or {}
 m = (llm.get("model_hint") or "").strip()
 t = llm.get("thinking")
@@ -83,10 +86,34 @@ if m:
 if isinstance(t, bool):
     print(f"export LLM_THINKING={'true' if t else 'false'}")
     print(f"export THINKING={'1' if t else '0'}")
+
+# Power-user knobs from the Advanced tab in Settings.  Each block is
+# optional — if the profile is older and doesn't have it we just don't
+# export those vars and the downstream defaults apply.
+adv = d.get("advanced", {}) or {}
+
+w = adv.get("whisper", {}) or {}
+if w.get("model"):        print(f"export WHISPER_MODEL={shlex.quote(w['model'])}")
+if w.get("compute_type"): print(f"export WHISPER_COMPUTE_TYPE={shlex.quote(w['compute_type'])}")
+if w.get("device"):       print(f"export WHISPER_DEVICE={shlex.quote(w['device'])}")
+
+il = adv.get("ik_llama", {}) or {}
+if isinstance(il.get("ctx"),          int): print(f"export CTX={il['ctx']}")
+if isinstance(il.get("threads"),      int) and il["threads"] > 0: print(f"export THREADS={il['threads']}")
+if isinstance(il.get("parallel"),     int): print(f"export PARALLEL={il['parallel']}")
+if isinstance(il.get("ngl"),          int): print(f"export NGL={il['ngl']}")
+if isinstance(il.get("moe_cpu_from"), int): print(f"export MOE_CPU_FROM={il['moe_cpu_from']}")
+if isinstance(il.get("moe_cpu"),      bool): print(f"export MOE_CPU={'1' if il['moe_cpu'] else '0'}")
+
+sec = adv.get("secrets", {}) or {}
+if sec.get("tavily_api_key"): print(f"export TAVILY_API_KEY={shlex.quote(sec['tavily_api_key'])}")
+if sec.get("n2yo_api_key"):   print(f"export N2YO_API_KEY={shlex.quote(sec['n2yo_api_key'])}")
 PY
 )"
-    [[ -n "${MODEL:-}" ]]      && echo "  Profile model hint: $MODEL"
-    [[ -n "${THINKING:-}" ]]   && echo "  Profile thinking: $LLM_THINKING"
+    [[ -n "${MODEL:-}" ]]            && echo "  Profile model hint: $MODEL"
+    [[ -n "${THINKING:-}" ]]         && echo "  Profile thinking: $LLM_THINKING"
+    [[ -n "${WHISPER_MODEL:-}" ]]    && echo "  Whisper: $WHISPER_MODEL ($WHISPER_COMPUTE_TYPE / $WHISPER_DEVICE)"
+    [[ -n "${CTX:-}" ]]              && echo "  ik_llama: CTX=$CTX, NGL=${NGL:-?}, MOE_CPU_FROM=${MOE_CPU_FROM:-?}"
 fi
 
 # ── Read LLM_BACKEND from .env (default: ollama) ─────────────────────────────

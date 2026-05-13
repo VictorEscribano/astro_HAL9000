@@ -87,6 +87,30 @@ def _default_profile(username: str) -> UserProfile:
             "speed": 0.9,
             "enabled": False,
         },
+        # Tunables that map to env vars exported by start.sh.  Most of
+        # these only take effect on the next backend launch (changing
+        # CTX requires re-loading the LLM, changing WHISPER_MODEL means
+        # re-downloading the new model on first use).  The Advanced tab
+        # in the UI surfaces a "requires restart" hint.
+        "advanced": {
+            "whisper": {
+                "model": "small",       # tiny / base / small / medium / large-v3
+                "compute_type": "int8", # int8 / float32
+                "device": "cpu",        # cpu / cuda
+            },
+            "ik_llama": {
+                "ctx": 8192,            # context window
+                "threads": 0,           # 0 = auto = nproc
+                "parallel": 1,          # parallel slots
+                "ngl": 999,             # layers to offload to GPU (-1/999 = all)
+                "moe_cpu": True,        # split MoE experts CPU/GPU
+                "moe_cpu_from": 14,     # first layer whose experts go to CPU
+            },
+            "secrets": {
+                "tavily_api_key": "",
+                "n2yo_api_key": "",
+            },
+        },
     }
 
 

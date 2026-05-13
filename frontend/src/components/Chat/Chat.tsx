@@ -115,6 +115,10 @@ export default function Chat() {
     const result = await mic.toggle();
     if (result != null && result.trim()) {
       setInput((prev) => prev.trim() ? `${prev.trim()} ${result}` : result);
+    } else if (result != null) {
+      // Recording finished but Whisper returned empty — probably silence /
+      // VAD filtered it out.  Surface a hint instead of failing silently.
+      console.info("[mic] transcripción vacía — Whisper no detectó habla");
     }
   }
 
@@ -546,6 +550,11 @@ export default function Chat() {
               </button>
             )}
           </div>
+          {mic.error && (
+            <div className="mt-1 text-[calc(8px*var(--fs))] font-mono text-red-400/90 break-words">
+              ⚠ {mic.error}
+            </div>
+          )}
         </div>
       </div>
     </PanelFrame>

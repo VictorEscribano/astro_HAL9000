@@ -9,7 +9,7 @@ const FONT_SIZES: { key: FontSize; label: string; cls: string }[] = [
   { key: "lg", label: "LG", cls: "text-[calc(14px*var(--fs))]" },
 ];
 
-type Tab = "appearance" | "session" | "settings";
+type Tab = "appearance" | "session" | "settings" | "advanced";
 
 interface Props { onClose: () => void }
 
@@ -359,6 +359,165 @@ function SettingsTab() {
   );
 }
 
+// ── Tab: Advanced (power-user knobs → env vars on next start) ───────────────
+function AdvancedTab() {
+  const advancedPrefs = useAppStore((s) => s.advancedPrefs);
+  const setAdvancedWhisper = useAppStore((s) => s.setAdvancedWhisper);
+  const setAdvancedIkLlama = useAppStore((s) => s.setAdvancedIkLlama);
+  const setAdvancedSecrets = useAppStore((s) => s.setAdvancedSecrets);
+  const [showTavily, setShowTavily] = useState(false);
+  const [showN2yo, setShowN2yo] = useState(false);
+
+  return (
+    <>
+      <div className="text-[calc(8px*var(--fs))] font-mono text-yellow-400/80 bg-yellow-400/5
+                      border border-yellow-400/20 rounded px-2 py-1.5 leading-relaxed">
+        ⚠ Estos parámetros se aplican como variables de entorno al lanzar
+        <code className="text-yellow-400 mx-1">./start.sh</code>.
+        Cambios aquí <strong>requieren reiniciar</strong> el backend para tener efecto.
+      </div>
+
+      <section>
+        <SectionLabel>Whisper (STT)</SectionLabel>
+        <div className="space-y-2">
+          <div>
+            <FieldLabel>Modelo</FieldLabel>
+            <select
+              value={advancedPrefs.whisper.model}
+              onChange={(e) => setAdvancedWhisper({ model: e.target.value })}
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1
+                         text-[calc(10px*var(--fs))] font-mono text-text focus:outline-none focus:border-accent-red/40"
+            >
+              {["tiny", "base", "small", "medium", "large-v3"].map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+            <div className="mt-0.5 text-[calc(8px*var(--fs))] font-mono text-dim/70">
+              tiny=39 MB · base=74 MB · small=244 MB · medium=769 MB · large=1.5 GB. La calidad sube con el tamaño.
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <FieldLabel>Compute type</FieldLabel>
+              <select
+                value={advancedPrefs.whisper.compute_type}
+                onChange={(e) => setAdvancedWhisper({ compute_type: e.target.value })}
+                className="w-full bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1
+                           text-[calc(10px*var(--fs))] font-mono text-text focus:outline-none focus:border-accent-red/40"
+              >
+                <option value="int8">int8 (rápido)</option>
+                <option value="int8_float16">int8_float16</option>
+                <option value="float16">float16</option>
+                <option value="float32">float32 (preciso)</option>
+              </select>
+            </div>
+            <div>
+              <FieldLabel>Device</FieldLabel>
+              <select
+                value={advancedPrefs.whisper.device}
+                onChange={(e) => setAdvancedWhisper({ device: e.target.value })}
+                className="w-full bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1
+                           text-[calc(10px*var(--fs))] font-mono text-text focus:outline-none focus:border-accent-red/40"
+              >
+                <option value="cpu">cpu</option>
+                <option value="cuda">cuda</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <SectionLabel>ik_llama (LLM server)</SectionLabel>
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <FieldLabel>Context (CTX)</FieldLabel>
+              <TextInput type="number" step="1024" value={String(advancedPrefs.ik_llama.ctx)}
+                onChange={(v) => setAdvancedIkLlama({ ctx: parseInt(v) || 0 })} />
+            </div>
+            <div>
+              <FieldLabel>Parallel slots</FieldLabel>
+              <TextInput type="number" step="1" value={String(advancedPrefs.ik_llama.parallel)}
+                onChange={(v) => setAdvancedIkLlama({ parallel: parseInt(v) || 1 })} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <FieldLabel>Threads (0=auto)</FieldLabel>
+              <TextInput type="number" step="1" value={String(advancedPrefs.ik_llama.threads)}
+                onChange={(v) => setAdvancedIkLlama({ threads: parseInt(v) || 0 })} />
+            </div>
+            <div>
+              <FieldLabel>GPU layers (NGL)</FieldLabel>
+              <TextInput type="number" step="1" value={String(advancedPrefs.ik_llama.ngl)}
+                onChange={(v) => setAdvancedIkLlama({ ngl: parseInt(v) || 0 })} />
+            </div>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={advancedPrefs.ik_llama.moe_cpu}
+              onChange={(e) => setAdvancedIkLlama({ moe_cpu: e.target.checked })}
+              className="accent-accent-red"
+            />
+            <span className="text-[calc(9px*var(--fs))] font-mono text-text/80">
+              MoE expert offload (split CPU/GPU)
+            </span>
+          </label>
+          <div>
+            <FieldLabel>Primera layer con experts en CPU</FieldLabel>
+            <TextInput type="number" step="1" value={String(advancedPrefs.ik_llama.moe_cpu_from)}
+              onChange={(v) => setAdvancedIkLlama({ moe_cpu_from: parseInt(v) || 0 })} />
+            <div className="mt-0.5 text-[calc(8px*var(--fs))] font-mono text-dim/70">
+              0=todos los experts en CPU (seguro/lento) · 14=mitad-mitad para 8GB VRAM · ≥20=mayoría en GPU
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <SectionLabel>API Keys</SectionLabel>
+        <div className="space-y-2">
+          <div>
+            <FieldLabel>Tavily (web_search)</FieldLabel>
+            <div className="flex gap-1">
+              <TextInput
+                type={showTavily ? "text" : "password"}
+                value={advancedPrefs.secrets.tavily_api_key}
+                onChange={(v) => setAdvancedSecrets({ tavily_api_key: v })}
+                placeholder="tvly-…"
+              />
+              <button
+                onClick={() => setShowTavily(!showTavily)}
+                className="px-2 text-[calc(8px*var(--fs))] font-mono text-dim hover:text-text border border-white/[0.08] hover:border-accent-red/30 rounded"
+              >{showTavily ? "○" : "●"}</button>
+            </div>
+          </div>
+          <div>
+            <FieldLabel>N2YO (satellite tracking)</FieldLabel>
+            <div className="flex gap-1">
+              <TextInput
+                type={showN2yo ? "text" : "password"}
+                value={advancedPrefs.secrets.n2yo_api_key}
+                onChange={(v) => setAdvancedSecrets({ n2yo_api_key: v })}
+                placeholder="XXXXXX-XXXXXX-…"
+              />
+              <button
+                onClick={() => setShowN2yo(!showN2yo)}
+                className="px-2 text-[calc(8px*var(--fs))] font-mono text-dim hover:text-text border border-white/[0.08] hover:border-accent-red/30 rounded"
+              >{showN2yo ? "○" : "●"}</button>
+            </div>
+          </div>
+          <div className="text-[calc(8px*var(--fs))] font-mono text-dim/70">
+            Se guardan en el perfil JSON del usuario (gitignored). Se exportan como env vars al lanzar el backend.
+          </div>
+        </div>
+      </section>
+    </>
+  );
+}
+
 // ── Main panel ──────────────────────────────────────────────────────────────
 export default function SettingsPanel({ onClose }: Props) {
   const [tab, setTab] = useState<Tab>("appearance");
@@ -386,6 +545,7 @@ export default function SettingsPanel({ onClose }: Props) {
         session: { observer: s.observer },
         llm: s.llmPrefs,
         voice: s.voicePrefs,
+        advanced: s.advancedPrefs,
       });
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 1500);
@@ -424,6 +584,7 @@ export default function SettingsPanel({ onClose }: Props) {
             ["appearance", "Apariencia"],
             ["session",    "Sesión"],
             ["settings",   "Settings"],
+            ["advanced",   "Avanzado"],
           ] as [Tab, string][]).map(([key, label]) => (
             <button
               key={key}
@@ -441,6 +602,7 @@ export default function SettingsPanel({ onClose }: Props) {
           {tab === "appearance" && <AppearanceTab />}
           {tab === "session" && <SessionTab onUsersChanged={refreshUsers} />}
           {tab === "settings" && <SettingsTab />}
+          {tab === "advanced" && <AdvancedTab />}
         </div>
 
         {/* Footer / save bar */}
