@@ -59,6 +59,36 @@ echo "  Active user: $HAL_USER"
 # Persist the selection so future starts default to it too.
 echo "$HAL_USER" > "$USERS_DIR/.active"
 
+# ── Pull LLM preferences out of the active user's profile ────────────────────
+# run_ik_llama.sh's MODEL substring picker (e.g. MODEL=4b → matches
+# Huihui-Qwen3-4B-…) defaults to "auto-pick the largest GGUF" when MODEL
+# is unset.  On an 8 GB-VRAM laptop with the 35B-A3B (18.65 GB) and the
+# 4B (2.5 GB) both downloaded, that auto-pick reliably chooses the 35B,
+# triggers a CUDA OOM during compute-buffer allocation, and crashes the
+# server before the chat can use it.  Honour the user's saved choice
+# instead — `MODEL=4b` etc.  Same idea for the THINKING flag.
+PROFILE_JSON="$USERS_DIR/$HAL_USER.json"
+if [[ -f "$PROFILE_JSON" ]] && command -v python3 >/dev/null 2>&1; then
+    eval "$(python3 - "$PROFILE_JSON" <<'PY'
+import json, sys, shlex
+try:
+    d = json.load(open(sys.argv[1]))
+except Exception:
+    sys.exit(0)
+llm = d.get("llm", {}) or {}
+m = (llm.get("model_hint") or "").strip()
+t = llm.get("thinking")
+if m:
+    print(f"export MODEL={shlex.quote(m)}")
+if isinstance(t, bool):
+    print(f"export LLM_THINKING={'true' if t else 'false'}")
+    print(f"export THINKING={'1' if t else '0'}")
+PY
+)"
+    [[ -n "${MODEL:-}" ]]      && echo "  Profile model hint: $MODEL"
+    [[ -n "${THINKING:-}" ]]   && echo "  Profile thinking: $LLM_THINKING"
+fi
+
 # ── Read LLM_BACKEND from .env (default: ollama) ─────────────────────────────
 LLM_BACKEND="ollama"
 if [[ -f "$SCRIPT_DIR/.env" ]]; then
