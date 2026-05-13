@@ -6,6 +6,7 @@ import ThinkingCard from "./ThinkingCard";
 import AssistantMarkdown from "./AssistantMarkdown";
 import PanelFrame from "../ui/PanelFrame";
 import { useKokoroTTS } from "./useKokoroTTS";
+import { useMicRecorder } from "./useMicRecorder";
 
 // ── Waveform ───────────────────────────────────────────────────────────────
 function Waveform({ active }: { active: boolean }) {
@@ -106,6 +107,16 @@ export default function Chat() {
   const stickToBottomRef = useRef(true);
   const abortRef = useRef<AbortController | null>(null);
   const tts = useKokoroTTS();
+  const mic = useMicRecorder();
+
+  // Pipe Whisper transcription into the chat input.  We append (with a
+  // space when there's already text) so users can dictate in chunks.
+  async function toggleMic() {
+    const result = await mic.toggle();
+    if (result != null && result.trim()) {
+      setInput((prev) => prev.trim() ? `${prev.trim()} ${result}` : result);
+    }
+  }
 
   // Detect user scroll → update sticky flag.  Threshold of 80px treats
   // "near the bottom" as still sticky to avoid flickering with small scrolls
@@ -487,6 +498,34 @@ export default function Chat() {
                          text-[calc(10px*var(--fs))] font-mono border border-white/[0.06] focus:outline-none
                          focus:border-accent-red/40 resize-none"
             />
+            {/* MIC — Whisper STT.  Hidden when backend reports unavailable
+                so users on a barebones install don't see a useless button.
+                Visual states:
+                  idle         → outlined, dim
+                  recording    → solid red, pulsing
+                  transcribing → outlined red, animated dots */}
+            {mic.available && (
+              <button
+                onClick={toggleMic}
+                disabled={mic.state === "transcribing"}
+                title={
+                  mic.state === "recording"  ? "Stop recording and transcribe"
+                  : mic.state === "transcribing" ? "Transcribing…"
+                  : "Record voice"
+                }
+                className={`rounded px-3 py-1.5 text-[calc(9px*var(--fs))] font-mono tracking-widest border transition-colors
+                  ${mic.state === "recording"
+                    ? "bg-accent-red text-bg border-accent-red animate-pulse"
+                    : mic.state === "transcribing"
+                    ? "text-accent-red border-accent-red/30"
+                    : "text-dim hover:text-accent-red border-white/[0.08] hover:border-accent-red/30"}`}
+              >
+                {mic.state === "recording"     ? "● REC"
+                 : mic.state === "transcribing" ? "··· STT"
+                 : "○ MIC"}
+              </button>
+            )}
+
             {loading ? (
               <button
                 onClick={cancelInflight}

@@ -13,11 +13,12 @@ import json
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.services.kokoro_tts import KokoroEngine, process_for_speech
+from app.services.whisper_stt import WhisperEngine
 
 log = logging.getLogger("astroagent.voice")
 router = APIRouter(prefix="/api/voice", tags=["voice"])
@@ -116,3 +117,44 @@ async def voice_speak(req: SpeakRequest):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ── Whisper STT ──────────────────────────────────────────────────────────────
+
+
+@router.post("/transcribe")
+async def voice_transcribe(
+    audio: UploadFile = File(..., description="Recorded audio blob (any ffmpeg-readable format; webm/opus from MediaRecorder works)."),
+    language: Optional[str] = Form(default=None, description="ISO 639-1 code; if omitted Whisper auto-detects."),
+):
+    """One-shot transcription: receive an audio blob, return the
+    transcribed text.  Frontend pipes the result into the chat input so
+    the user can review / edit before sending."""
+    data = await audio.read()
+    if not data:
+        raise HTTPException(400, "Empty audio payload.")
+
+    try:
+        eng = WhisperEngine.get()
+        result = await eng.transcribe(data, language=language)
+    except Exception as e:
+        log.exception("Whisper transcription failed")
+        raise HTTPException(500, f"Transcription failed: {e}")
+
+    log.info("Whisper: %.1fs audio → %d chars (%s, p=%.2f)",
+             result.get("duration", 0.0),
+             len(result.get("text", "")),
+             result.get("language"),
+             result.get("language_probability", 0.0))
+    return result
+
+
+@router.get("/transcribe/health")
+async def transcribe_health():
+    """Frontend uses this to decide whether to even show the MIC button."""
+    eng = WhisperEngine.get()
+    return {
+        "available": True,
+        "loaded": eng.is_loaded,
+        "model": __import__("os").environ.get("WHISPER_MODEL", "small"),
+    }
