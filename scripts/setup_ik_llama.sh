@@ -40,7 +40,35 @@ fi
 cd "$REPO_DIR"
 CMAKE_FLAGS=(-B build -DGGML_NATIVE=ON -DBUILD_SHARED_LIBS=OFF)
 if [[ "$WITH_CUDA" == "1" ]]; then
-    CMAKE_FLAGS+=(-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="$CUDA_ARCH")
+    # Locate nvcc.  Ubuntu's CUDA toolkit installs it under
+    # /usr/local/cuda/bin or /usr/local/cuda-<ver>/bin, but those bin dirs
+    # are not on PATH by default — so CMake's `enable_language(CUDA)` fails
+    # with "No CMAKE_CUDA_COMPILER could be found" even though the headers
+    # are detected.  Find nvcc explicitly and pass it via CMAKE_CUDA_COMPILER.
+    NVCC_BIN="${NVCC_BIN:-$(command -v nvcc || true)}"
+    if [[ -z "$NVCC_BIN" ]]; then
+        for cand in /usr/local/cuda/bin/nvcc \
+                    /usr/local/cuda-*/bin/nvcc \
+                    /opt/cuda/bin/nvcc; do
+            if [[ -x "$cand" ]]; then NVCC_BIN="$cand"; break; fi
+        done
+    fi
+    if [[ -z "$NVCC_BIN" || ! -x "$NVCC_BIN" ]]; then
+        echo "ERROR: WITH_CUDA=1 but nvcc was not found." >&2
+        echo "  Install the CUDA Toolkit (apt install nvidia-cuda-toolkit on Ubuntu)" >&2
+        echo "  or point NVCC_BIN at it: NVCC_BIN=/usr/local/cuda-XX.Y/bin/nvcc $0" >&2
+        echo "  Or skip CUDA: WITH_CUDA=0 $0" >&2
+        exit 1
+    fi
+    echo "  nvcc     : $NVCC_BIN ($($NVCC_BIN --version | tail -1))"
+    # Put the CUDA bin on PATH for the build subprocesses too.
+    CUDA_BIN_DIR="$(dirname "$NVCC_BIN")"
+    export PATH="$CUDA_BIN_DIR:$PATH"
+    CMAKE_FLAGS+=(
+        -DGGML_CUDA=ON
+        -DCMAKE_CUDA_ARCHITECTURES="$CUDA_ARCH"
+        -DCMAKE_CUDA_COMPILER="$NVCC_BIN"
+    )
 fi
 
 echo "--- cmake configure ---"

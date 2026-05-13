@@ -47,10 +47,9 @@ from langgraph.graph import END, START, StateGraph
 
 from app.agent.llm import make_streaming_llm
 from app.agent.memory import get_memory
-from app.agent.models import HALToolCall, Intent, Plan, ToolResult
+from app.agent.models import HALToolCall, Plan, ToolResult
 from app.agent.prompts import RESPONSE_GENERATION_PROMPT, build_system_prompt
 from app.agent.tools import (
-    classify_intent,
     execute_tool,
     extract_tool_args,
     make_plan,
@@ -81,7 +80,6 @@ class HALState(TypedDict, total=False):
     user_id: str
     session_id: str
 
-    intent: Intent | None
     memory_context: str
 
     plan: Plan | None
@@ -98,12 +96,6 @@ class HALState(TypedDict, total=False):
 
 
 # ── Nodes ────────────────────────────────────────────────────────────────────
-
-
-async def node_intent_classifier(state: HALState) -> dict[str, Any]:
-    intent = await classify_intent(state["user_message"], history=state.get("history"))
-    log.info("intent → %s | %s", intent.kind, intent.rationale[:80])
-    return {"intent": intent}
 
 
 async def node_memory_retrieval(state: HALState) -> dict[str, Any]:
@@ -329,15 +321,10 @@ async def node_response_seed(state: HALState) -> dict[str, Any]:
 # ── Routing ──────────────────────────────────────────────────────────────────
 
 
-def route_after_intent(state: HALState) -> Literal["planner", "response_seed"]:
-    intent = state.get("intent")
-    return "planner" if (intent and intent.kind == "tool") else "response_seed"
-
-
 def route_after_planner(state: HALState) -> Literal["tool_executor", "response_seed"]:
-    """If the planner produced an empty plan (e.g. it decided no tool was
-    actually needed despite the intent classifier's vote), skip straight to
-    response generation — there's nothing to execute."""
+    """The planner is the single is-this-a-tool-turn decision: empty
+    `plan.steps` means conversation, jump straight to response generation;
+    non-empty means the tool executor takes over."""
     plan = state.get("plan")
     if plan and plan.steps:
         return "tool_executor"
@@ -362,8 +349,17 @@ def route_after_tool(state: HALState) -> Literal["tool_executor", "self_correcti
 
 
 def build_graph():
+    """Pipeline:
+
+        START → memory_retrieval → planner ─┬→ tool_executor (loop) → memory_write → response_seed → END
+                                            └→ response_seed (no tools needed) → END
+
+    The planner is the single is-this-a-tool-turn decision; we used to run
+    a separate `intent_classifier` LLM call before it but its only job was
+    to gate the planner, and the planner already returns `steps=[]` for
+    pure-conversation turns.  Dropping the classifier saves one LLM call
+    per turn (≈25 % latency on hybrid-MoE backends like ik_llama)."""
     g = StateGraph(HALState)
-    g.add_node("intent_classifier", node_intent_classifier)
     g.add_node("memory_retrieval",  node_memory_retrieval)
     g.add_node("planner",           node_planner)
     g.add_node("tool_executor",     node_tool_executor)
@@ -371,9 +367,8 @@ def build_graph():
     g.add_node("memory_write",      node_memory_write)
     g.add_node("response_seed",     node_response_seed)
 
-    g.add_edge(START, "intent_classifier")
-    g.add_edge("intent_classifier", "memory_retrieval")
-    g.add_conditional_edges("memory_retrieval", route_after_intent)
+    g.add_edge(START, "memory_retrieval")
+    g.add_edge("memory_retrieval", "planner")
     g.add_conditional_edges("planner", route_after_planner)
     g.add_conditional_edges("tool_executor", route_after_tool)
     g.add_edge("self_correction", "tool_executor")
@@ -476,9 +471,10 @@ async def run_agent_stream(
                 yield ev
 
     # Stream the final natural-language response with ChatOllama so the chat
-    # panel sees tokens appear progressively.
-    async for tok in _stream_response(final_state):
-        yield {"type": "token", "content": tok}
+    # panel sees tokens appear progressively.  `_stream_response` now yields
+    # event dicts directly (token / thinking).
+    async for ev in _stream_response(final_state):
+        yield ev
 
     log.info("HAL turn done | retries=%d | tool=%s",
              final_state.get("retry_count", 0),
@@ -486,26 +482,29 @@ async def run_agent_stream(
     yield {"type": "done"}
 
 
-class _ThinkStripper:
-    """Stateful stream filter that drops everything inside <think>…</think>.
+class _ThinkSplitter:
+    """Stateful stream splitter for `<think>…</think>` content.
 
-    The HAL prompt instructs the model to use those blocks for internal
-    reasoning, so they must never reach the user.  We process tokens as they
-    arrive — buffering only when we're inside a tag or potentially mid-tag.
+    `.feed(token)` returns `(visible, thinking)` — both possibly empty —
+    instead of dropping the thinking part as the old `_ThinkStripper` did.
+    The tags themselves are consumed, never emitted.  Callers route the
+    two streams to different UI surfaces (reasoning card vs. response body).
 
-    Failsafe: if the stream ends while we're still inside an unclosed
-    `<think>` AND we never produced any visible output, we release the
-    buffered content anyway — better to leak reasoning than to leave the
-    user with a blank reply."""
+    Failsafe on flush: if the stream ends inside an unclosed `<think>`,
+    the buffered thinking content is released as thinking output (so a
+    truncated reasoning block is still visible to the user) — and if no
+    visible content was ever emitted, the caller is responsible for
+    surfacing a user-facing note (we no longer leak reasoning into the
+    response body)."""
 
     def __init__(self) -> None:
         self._inside = False
-        self._buf = ""
-        self._inside_buf = ""  # held while inside, used as failsafe on flush
-        self._emitted_anything = False
+        self._buf = ""             # pending bytes that may complete a tag
+        self._inside_buf = ""      # thinking bytes held until we flush
 
-    def feed(self, token: str) -> str:
-        out: list[str] = []
+    def feed(self, token: str) -> tuple[str, str]:
+        out_vis: list[str] = []
+        out_th: list[str] = []
         text = self._buf + token
         self._buf = ""
         i = 0
@@ -513,60 +512,48 @@ class _ThinkStripper:
             if self._inside:
                 close = text.find("</think>", i)
                 if close < 0:
-                    self._inside_buf += text[i:]
-                    return self._record(out)
-                self._inside_buf += text[i:close]
+                    out_th.append(text[i:])
+                    return "".join(out_vis), "".join(out_th)
+                out_th.append(text[i:close])
                 i = close + len("</think>")
                 self._inside = False
                 continue
             open_idx = text.find("<think>", i)
             if open_idx < 0:
+                # Keep up to (len("<think>") - 1) bytes back in case the
+                # next chunk completes an opening tag.
                 tail_start = max(i, len(text) - len("<think>") + 1)
-                out.append(text[i:tail_start])
+                out_vis.append(text[i:tail_start])
                 self._buf = text[tail_start:]
-                return self._record(out)
-            out.append(text[i:open_idx])
+                return "".join(out_vis), "".join(out_th)
+            out_vis.append(text[i:open_idx])
             i = open_idx + len("<think>")
             self._inside = True
-        return self._record(out)
+        return "".join(out_vis), "".join(out_th)
 
-    def _record(self, parts: list[str]) -> str:
-        s = "".join(parts)
-        if s:
-            self._emitted_anything = True
-        return s
-
-    def flush(self) -> str:
-        # On end-of-stream `_buf` may hold up to len("<think>")-1 chars that we
-        # were keeping back in case they completed an opening tag.  If we're
-        # NOT inside a think block, those bytes are visible content and must
-        # be released — otherwise the last few characters of the reply get
-        # silently truncated mid-word.
+    def flush(self) -> tuple[str, str]:
         if not self._inside and self._buf:
             tail = self._buf
             self._buf = ""
-            self._inside_buf = ""
-            self._emitted_anything = True
-            return tail
-        if self._emitted_anything:
-            # Inside an unclosed <think> after visible content — discard.
-            self._buf = ""
-            self._inside_buf = ""
-            return ""
-        # Nothing visible was emitted.  Failsafe: release whatever we held so
-        # the user doesn't get a blank reply.  Strip the <think> wrapper.
-        leftover = (self._inside_buf + self._buf).strip()
+            return tail, ""
+        # Inside an unclosed <think>: release as thinking, not as visible.
+        leftover = self._buf
         self._buf = ""
-        self._inside_buf = ""
-        return leftover
+        if leftover:
+            return "", leftover
+        return "", ""
 
 
-async def _stream_response(state: HALState) -> AsyncIterator[str]:
+async def _stream_response(state: HALState) -> AsyncIterator[dict]:
     """Stream the final assistant message token-by-token from the configured
-    LLM backend (Ollama or ik_llama.cpp).  Ollama defaults are tight
-    (num_ctx=2048, num_predict=128 chop replies mid-sentence); the factory
-    widens both.  For ik_llama, num_ctx is set at server launch — only
-    num_predict (max_tokens) takes effect per request."""
+    LLM backend (Ollama or ik_llama.cpp).  Yields event dicts:
+      - `{type: "token",    content: str}` — visible response token(s)
+      - `{type: "thinking", content: str}` — bytes inside a `<think>` block
+
+    Ollama defaults are tight (num_ctx=2048, num_predict=128 chop replies
+    mid-sentence); the factory widens both.  For ik_llama, num_ctx is set
+    at server launch — only num_predict (max_tokens) takes effect per
+    request."""
     llm = make_streaming_llm(temperature=0.3, num_ctx=8192, num_predict=1024)
 
     system = build_system_prompt(memory_context=state.get("memory_context") or "")
@@ -583,18 +570,31 @@ async def _stream_response(state: HALState) -> AsyncIterator[str]:
     if seed:
         msgs.append(SystemMessage(content=RESPONSE_GENERATION_PROMPT + "\n\n" + seed))
 
-    stripper = _ThinkStripper()
+    splitter = _ThinkSplitter()
+    visible_emitted = False
     try:
         async for chunk in llm.astream(msgs):
             content = getattr(chunk, "content", "")
             if not content:
                 continue
-            visible = stripper.feed(content)
-            if visible:
-                yield visible
-        tail = stripper.flush()
-        if tail:
-            yield tail
+            vis, think = splitter.feed(content)
+            if think:
+                yield {"type": "thinking", "content": think}
+            if vis:
+                visible_emitted = True
+                yield {"type": "token", "content": vis}
+        vis_tail, think_tail = splitter.flush()
+        if think_tail:
+            yield {"type": "thinking", "content": think_tail}
+        if vis_tail:
+            visible_emitted = True
+            yield {"type": "token", "content": vis_tail}
+        if not visible_emitted:
+            # Model spent all its budget thinking and never closed the block —
+            # the reasoning is still visible in the thinking card, but the
+            # response body would otherwise be empty.
+            yield {"type": "token",
+                   "content": "(razonamiento incompleto — el modelo no llegó a generar respuesta)"}
     except Exception as e:
         log.exception("response stream failed: %s", e)
-        yield f"\n\n[error generando respuesta: {e}]"
+        yield {"type": "token", "content": f"\n\n[error generando respuesta: {e}]"}

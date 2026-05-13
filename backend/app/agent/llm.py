@@ -44,6 +44,20 @@ def _backend_endpoint(s) -> tuple[str, str]:
     return f"{s.ollama_base_url}/v1", s.ollama_model
 
 
+def _ik_llama_extra_body() -> dict:
+    """Default `extra_body` payload sent on every OpenAI-style request when
+    the backend is ik_llama.cpp.  Qwen3 (and other reasoning-capable Qwen
+    variants) enable a `<think>…</think>` block by default — useful for
+    one-shot QA but catastrophic for HAL: each turn issues 4 LLM calls
+    and 200-300 thinking tokens per call piles up to ~30-40 s of latency.
+
+    Controlled by the `LLM_THINKING` env var (default off).  Setting it true
+    lets reasoning-tuned variants (e.g. Qwen3-Thinking, Qwen3.5-A3B with
+    thinking on) reason out loud — useful for evaluating quality, painful
+    for real-time chat."""
+    return {"chat_template_kwargs": {"enable_thinking": get_settings().llm_thinking}}
+
+
 @lru_cache
 def get_instructor_client():
     """Return an `instructor`-wrapped OpenAI client targeting the active LLM
@@ -59,10 +73,26 @@ def get_instructor_client():
     # JSON mode constrains output to valid JSON for our Pydantic schemas.
     # ik_llama.cpp supports it via the same `response_format` param Ollama uses
     # in OpenAI-compat mode.
-    return instructor.from_openai(
+    client = instructor.from_openai(
         OpenAI(base_url=base_url, api_key=s.llm_backend),  # api_key is unused but required by SDK
         mode=instructor.Mode.JSON,
     )
+    # Wrap the chat.completions.create method so every instructor call
+    # carries the extra_body that disables thinking on Qwen3.  Doing it
+    # here avoids polluting every call site in tools.py.
+    if s.llm_backend == "ik_llama":
+        _orig_create = client.chat.completions.create
+        _extra = _ik_llama_extra_body()
+
+        def _create_with_extra(*args, **kwargs):
+            kwargs.setdefault("extra_body", {})
+            # Merge our defaults under any caller-supplied values.
+            for k, v in _extra.items():
+                kwargs["extra_body"].setdefault(k, v)
+            return _orig_create(*args, **kwargs)
+
+        client.chat.completions.create = _create_with_extra
+    return client
 
 
 def get_active_model_name() -> str:
@@ -95,6 +125,10 @@ def make_streaming_llm(*, temperature: float = 0.3,
             temperature=temperature,
             max_tokens=num_predict,
             streaming=True,
+            # Pass-through to the OpenAI SDK as `extra_body`; llama-server
+            # forwards `chat_template_kwargs` to the Jinja chat template,
+            # which lets us disable Qwen3's thinking mode globally.
+            extra_body=_ik_llama_extra_body(),
         )
 
     from langchain_ollama import ChatOllama

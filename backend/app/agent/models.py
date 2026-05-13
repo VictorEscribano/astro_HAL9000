@@ -189,6 +189,30 @@ class PythonExec(HALToolCall):
     code: str = Field(..., min_length=1, description="Python source to execute.")
 
 
+# ── Web search ───────────────────────────────────────────────────────────────
+
+
+class WebSearch(HALToolCall):
+    """Search the live web for facts HAL doesn't have locally — current events,
+    biographies, equipment reviews, links to papers/profiles/wikipedia, weather
+    advisories, etc.
+
+    Use this ONLY when the answer needs information beyond the model's training
+    cut-off or beyond HAL's astronomy tools (ephemerides, satellites, weather
+    already cover those).  Examples that DO fit: "who is John Dobson?",
+    "latest news from the Webb telescope", "find the Wikipedia page of
+    NGC 6946", "compare reviews of the ZWO ASI294MC Pro".
+
+    The caller specifies how many results to retrieve; 3-5 is usually enough.
+    Backend prefers Tavily (cleaner snippets) and falls back to DuckDuckGo if
+    no API key is configured."""
+
+    query: str = Field(..., min_length=2, max_length=300,
+                       description="Search query in natural language. Be specific.")
+    max_results: int = Field(default=5, ge=1, le=10,
+                             description="How many top results to return (1-10).")
+
+
 # ── Discriminated union of every tool ────────────────────────────────────────
 
 
@@ -211,6 +235,7 @@ AnyToolCall = Union[
     CameraSequence,
     WeatherQuery,
     PythonExec,
+    WebSearch,
 ]
 
 
@@ -221,6 +246,7 @@ ToolName = Literal[
     "tracking_feasibility",
     "camera_expose", "camera_sequence",
     "weather", "python_exec",
+    "web_search",
 ]
 
 
@@ -316,6 +342,7 @@ TOOL_CATALOGUE: list[tuple[str, type[HALToolCall], str]] = [
     ("camera_sequence",             CameraSequence,            "Scheduled multi-frame exposure sequence."),
     ("weather",                     WeatherQuery,              "Current weather + seeing/transparency."),
     ("python_exec",                 PythonExec,                "Run arbitrary Python in the analysis kernel."),
+    ("web_search",                  WebSearch,                 "Search the live web for current events, biographies, links, papers, equipment reviews — anything outside the model's training data or HAL's astronomy tools."),
 ]
 
 
