@@ -176,6 +176,29 @@ interface AppState {
    *  switch ObjectView to the Code tab, and mark it attached so the next
    *  user message includes it as context. */
   openCodeInEditor: (code: string) => void;
+
+  // ── User profiles ────────────────────────────────────────────────────────
+  /** Currently active user (mirrors backend `.active` file).  Null until
+   *  `/api/users/current` has been fetched. */
+  currentUser: string | null;
+  /** All known user profiles fetched from `/api/users`. */
+  knownUsers: string[];
+  /** LLM-related preferences persisted with the user profile. */
+  llmPrefs: { backend: string; model_hint: string; thinking: boolean; language: string };
+  /** Voice-related preferences persisted with the user profile. */
+  voicePrefs: { voice: string; speed: number; enabled: boolean };
+  setLlmPrefs: (p: Partial<{ backend: string; model_hint: string; thinking: boolean; language: string }>) => void;
+  setVoicePrefs: (p: Partial<{ voice: string; speed: number; enabled: boolean }>) => void;
+  setCurrentUser: (u: string | null) => void;
+  setKnownUsers: (u: string[]) => void;
+  /** Replace the whole settings block from a fetched profile.  Called on
+   *  mount and after switching users. */
+  applyProfile: (p: {
+    appearance?: { fontSize?: FontSize; themeAccent?: ThemeAccent };
+    session?: { observer?: Observer };
+    llm?: { backend?: string; model_hint?: string; thinking?: boolean; language?: string };
+    voice?: { voice?: string; speed?: number; enabled?: boolean };
+  }) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -248,4 +271,20 @@ export const useAppStore = create<AppState>((set) => ({
     editorAttached: true,
     objectViewTab: "code",
   }),
+
+  currentUser: null,
+  knownUsers: [],
+  llmPrefs: { backend: "ik_llama", model_hint: "4b", thinking: true, language: "es" },
+  voicePrefs: { voice: "ef_dora", speed: 0.9, enabled: false },
+  setLlmPrefs: (p) => set((s) => ({ llmPrefs: { ...s.llmPrefs, ...p } })),
+  setVoicePrefs: (p) => set((s) => ({ voicePrefs: { ...s.voicePrefs, ...p } })),
+  setCurrentUser: (u) => set({ currentUser: u }),
+  setKnownUsers: (u) => set({ knownUsers: u }),
+  applyProfile: (p) => set((s) => ({
+    fontSize: (p.appearance?.fontSize as FontSize) ?? s.fontSize,
+    themeAccent: (p.appearance?.themeAccent as ThemeAccent) ?? s.themeAccent,
+    observer: p.session?.observer ?? s.observer,
+    llmPrefs: { ...s.llmPrefs, ...(p.llm ?? {}) },
+    voicePrefs: { ...s.voicePrefs, ...(p.voice ?? {}) },
+  })),
 }));

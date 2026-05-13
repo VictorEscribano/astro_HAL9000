@@ -16,6 +16,49 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "🔭 Starting AstroAgent..."
 
+# ── User selection ───────────────────────────────────────────────────────────
+# Pick which user profile to load.  The backend persists per-user prefs in
+# backend/data/users/<name>.json (settings panel writes them) plus a
+# .active sentinel pointing at the last selection.
+#
+# Priority:
+#   1. HAL_USER already set in the environment    → use as-is
+#   2. backend/data/users/.active                 → suggest as default
+#   3. backend/data/users/*.json                  → list, default to first
+#   4. no profiles yet                            → backend bootstraps "Victor"
+#
+# If stdin is a TTY (interactive shell), prompt; otherwise silently honour
+# the default so non-interactive launches (CI, systemd) still work.
+USERS_DIR="$SCRIPT_DIR/backend/data/users"
+mkdir -p "$USERS_DIR"
+if [[ -z "${HAL_USER:-}" ]]; then
+    available=()
+    while IFS= read -r f; do
+        b="$(basename "$f" .json)"
+        [[ "$b" == .* ]] && continue
+        available+=("$b")
+    done < <(ls "$USERS_DIR"/*.json 2>/dev/null)
+    active_default=""
+    [[ -f "$USERS_DIR/.active" ]] && active_default="$(cat "$USERS_DIR/.active" | tr -d '[:space:]')"
+    if [[ -z "$active_default" && ${#available[@]} -gt 0 ]]; then
+        active_default="${available[0]}"
+    fi
+    [[ -z "$active_default" ]] && active_default="Victor"
+
+    if [[ -t 0 && ${#available[@]} -gt 0 ]]; then
+        echo "  Available users: ${available[*]}"
+        read -rp "  Select user [$active_default]: " chosen
+        HAL_USER="${chosen:-$active_default}"
+    else
+        HAL_USER="$active_default"
+    fi
+fi
+export HAL_USER
+echo "  Active user: $HAL_USER"
+
+# Persist the selection so future starts default to it too.
+echo "$HAL_USER" > "$USERS_DIR/.active"
+
 # ── Read LLM_BACKEND from .env (default: ollama) ─────────────────────────────
 LLM_BACKEND="ollama"
 if [[ -f "$SCRIPT_DIR/.env" ]]; then

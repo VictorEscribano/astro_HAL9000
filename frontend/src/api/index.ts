@@ -72,6 +72,24 @@ export const api = {
 
   chatHealth: () => fetchJson("/api/chat/health"),
   weather:    (coords?: ObsCoords) => fetchJson(`/api/sky/weather${qs(coords)}`),
+
+  // User profiles
+  usersList:    () => fetchJson("/api/users"),
+  userCurrent:  () => fetchJson("/api/users/current"),
+  userCreate:   (username: string) => postJson("/api/users", { username }),
+  userUpdate:   (username: string, settings: unknown) =>
+    fetch(`${BASE}/api/users/${encodeURIComponent(username)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(settings),
+    }).then((r) => {
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      return r.json();
+    }),
+  userDelete:   (username: string) =>
+    fetch(`${BASE}/api/users/${encodeURIComponent(username)}`, { method: "DELETE" })
+      .then((r) => { if (!r.ok) throw new Error(`${r.status} ${r.statusText}`); return r.json(); }),
+  userSetActive: (username: string) => postJson("/api/users/active", { username }),
 };
 
 export const CHAT_STREAM_URL = `${BASE}/api/chat/stream`;

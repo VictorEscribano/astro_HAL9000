@@ -122,6 +122,21 @@ export default function App() {
     return () => clearInterval(id);
   }, [observer.lat, observer.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load the active user's persisted profile once on mount — overrides the
+  // store defaults (font size, accent, observer, llm/voice prefs) with
+  // whatever the user saved last time.
+  useEffect(() => {
+    (async () => {
+      try {
+        const list = await api.usersList();
+        useAppStore.getState().setKnownUsers(list.users ?? []);
+        useAppStore.getState().setCurrentUser(list.active ?? null);
+        const profile = await api.userCurrent();
+        useAppStore.getState().applyProfile(profile);
+      } catch { /* backend may not be ready on first paint — silent retry-free */ }
+    })();
+  }, []);
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-bg text-text">
       <StatusBar />
