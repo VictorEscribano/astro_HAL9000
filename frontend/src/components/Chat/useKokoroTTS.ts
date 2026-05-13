@@ -34,6 +34,27 @@ export interface KokoroTTSHandle {
 const DEFAULT_VOICE_ES = "ef_dora";
 const DEFAULT_VOICE_EN = "af_heart";
 
+/** Map Kokoro voice prefix → phonemizer language code so the espeak
+ *  backend phonemises the text with rules that match the voice's
+ *  accent (otherwise an `em_santa` reading Spanish text comes out
+ *  with English phonetics).  Mirrors the alphabet Kokoro v1 uses:
+ *  a=US, b=UK, e=ES, f=FR, i=IT, j=JA, p=PT-BR, z=Mandarin, h=Hindi. */
+const VOICE_PREFIX_TO_LANG: Record<string, string> = {
+  a: "en-us",
+  b: "en-gb",
+  e: "es",
+  f: "fr-fr",
+  i: "it",
+  j: "ja",
+  p: "pt-br",
+  z: "cmn",
+  h: "hi",
+};
+function langForVoice(voice: string | null): string {
+  if (!voice) return "en-us";
+  return VOICE_PREFIX_TO_LANG[voice[0]] ?? "en-us";
+}
+
 interface AudioChunk {
   sentence: string;
   buffer: AudioBuffer;
@@ -173,7 +194,11 @@ export function useKokoroTTS(): KokoroTTSHandle {
       const ctx = await ensureAudioContext();
       nextStartTimeRef.current = ctx.currentTime;
 
-      const lang = (navigator.language || "en").toLowerCase().startsWith("es") ? "es" : "en";
+      // Derive the phonemizer lang from the voice itself so the text gets
+      // phonemised with the right rules.  Picking a Spanish voice but
+      // leaving lang on English makes the model read Spanish with a
+      // heavy English accent.
+      const lang = langForVoice(selectedVoice);
       let resp: Response;
       try {
         resp = await fetch(`${API_BASE_URL}/api/voice/speak`, {
