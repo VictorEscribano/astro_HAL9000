@@ -19,3 +19,11 @@ numpy>=1.26
 instructor>=1.4
 openai>=1.40
 chromadb>=0.5
+# OpenAI-compatible streaming wrapper used when LLM_BACKEND=ik_llama
+# (talks to ik_llama.cpp's llama-server via /v1/chat/completions).
+langchain-openai>=0.3
+# Web search backends used by tools/web_search.py.  Tavily is the preferred
+# path (clean LLM-tuned snippets, free tier 1000/mo) but optional — without
+# TAVILY_API_KEY the tool falls back to DuckDuckGo via the `ddgs` library.
+tavily-python>=0.5
+ddgs>=9.0

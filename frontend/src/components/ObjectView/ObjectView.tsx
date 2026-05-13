@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useAppStore, type StelSelection } from "../../store";
 import PanelFrame from "../ui/PanelFrame";
+import CodeInspector from "../CodeInspector/CodeInspector";
 
 // Object image lookup — reliable public domain / NASA/ESA images
 const OBJECT_IMAGES: Record<string, string> = {
@@ -313,8 +314,9 @@ function CameraPanel() {
 
 // ── Object view panel ─────────────────────────────────────────────────────
 export default function ObjectView() {
-  const { selectedTarget, stelSelection } = useAppStore();
-  const [activeTab, setActiveTab] = useState<"object" | "camera">("object");
+  const { selectedTarget, stelSelection, objectViewTab, setObjectViewTab } = useAppStore();
+  const activeTab = objectViewTab;
+  const setActiveTab = setObjectViewTab;
 
   // Stellarium drives the data when something is selected; fall back to the
   // catalog-side selection (e.g. user clicked a target before $stel was ready).
@@ -329,7 +331,7 @@ export default function ObjectView() {
   return (
     <PanelFrame className="h-full flex flex-col" accent="red">
       <div className="flex shrink-0 border-b border-white/[0.06]">
-        {(["object", "camera"] as const).map((tab) => (
+        {(["object", "camera", "code"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -339,13 +341,19 @@ export default function ObjectView() {
                 : "text-dim hover:text-text"
               }`}
           >
-            {tab === "object" ? "⊙ Object View" : "⊡ Camera Control"}
+            {tab === "object"
+              ? "⊙ Object View"
+              : tab === "camera"
+              ? "⊡ Camera Control"
+              : "⟨/⟩ Code Inspector"}
           </button>
         ))}
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden">
-        {activeTab === "camera" ? (
+        {activeTab === "code" ? (
+          <CodeInspector />
+        ) : activeTab === "camera" ? (
           <CameraPanel />
         ) : !hasSelection ? (
           <div className="flex items-center justify-center h-full">

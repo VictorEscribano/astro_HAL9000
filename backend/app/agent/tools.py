@@ -20,9 +20,7 @@ import json
 import logging
 from typing import Any, Type
 
-import instructor
-from openai import OpenAI
-
+from app.agent.llm import get_active_model_name, get_instructor_client
 from app.agent.models import (
     CameraExposure,
     CameraSequence,
@@ -45,6 +43,7 @@ from app.agent.models import (
     ToolSelection,
     TrackingFeasibilityCheck,
     WeatherQuery,
+    WebSearch,
     tool_list_for_prompt,
 )
 from app.agent.prompts import INTENT_CLASSIFIER_PROMPT, TOOL_EXTRACTION_PROMPT
@@ -53,27 +52,14 @@ from app.config import get_settings
 log = logging.getLogger("astroagent.tools")
 
 
-# ── Instructor / Ollama client ───────────────────────────────────────────────
-
-
-def _make_client():
-    """Build an OpenAI-compatible client pointed at Ollama, wrapped by
-    instructor in JSON mode (forces grammar-constrained output)."""
-    s = get_settings()
-    return instructor.from_openai(
-        OpenAI(base_url=f"{s.ollama_base_url}/v1", api_key="ollama"),
-        mode=instructor.Mode.JSON,
-    )
-
-
-_CLIENT = None
+# ── Instructor client (backend-agnostic) ─────────────────────────────────────
 
 
 def client():
-    global _CLIENT
-    if _CLIENT is None:
-        _CLIENT = _make_client()
-    return _CLIENT
+    """Backwards-compatible alias for the backend-aware instructor client.
+    All extraction calls below use this so they automatically follow the
+    `llm_backend` setting."""
+    return get_instructor_client()
 
 
 # ── Structured extraction ────────────────────────────────────────────────────
@@ -108,7 +94,7 @@ async def classify_intent(user_message: str, history: list[dict] | None = None) 
 
     def _call():
         return client().chat.completions.create(
-            model=s.ollama_model,
+            model=get_active_model_name(),
             response_model=Intent,
             temperature=0.1,
             max_retries=2,
@@ -137,7 +123,7 @@ async def make_plan(user_message: str, history: list[dict] | None = None) -> Pla
 
     def _call():
         return client().chat.completions.create(
-            model=s.ollama_model,
+            model=get_active_model_name(),
             response_model=Plan,
             temperature=0.1,
             max_retries=2,
@@ -166,7 +152,20 @@ async def make_plan(user_message: str, history: list[dict] | None = None) -> Pla
                      "mapa terrestre) → `tracking_feasibility` (comprobar que "
                      "la velocidad angular cabe dentro de la velocidad máxima "
                      "del motor) → solo si es factible, `mount_goto` o "
-                     "`mount_track`.  NO uses `object_position` para satélites.\n\n"
+                     "`mount_track`.  NO uses `object_position` para satélites.\n"
+                     "- Si el usuario pide un cálculo, conversión de unidades, "
+                     "script, simulación, plot, transformación de datos, o "
+                     "cualquier 'hazme un programa que…' / 'calcula X' / "
+                     "'simula Y' → SIEMPRE incluye `python_exec` en el plan. "
+                     "NUNCA respondas con código sin ejecutarlo; el sandbox "
+                     "tiene numpy, astropy, skyfield y sgp4 pre-cargados. "
+                     "Si necesitas datos en vivo primero (posiciones, TLEs), "
+                     "ejecuta primero la herramienta correspondiente y luego "
+                     "`python_exec` para procesarlos.\n"
+                     "- Si el usuario pide información actual de la web "
+                     "(noticias recientes, biografías, perfiles, papers, "
+                     "reviews de equipo, cosas posteriores a tu entrenamiento) "
+                     "→ usa `web_search`. No inventes URLs ni datos.\n\n"
                      "Devuelve solo JSON."
                  )},
                 {"role": "user",
@@ -222,7 +221,7 @@ async def extract_tool_args(
 
     def _call():
         return client().chat.completions.create(
-            model=s.ollama_model,
+            model=get_active_model_name(),
             response_model=schema,
             temperature=0.1,
             max_retries=2,
@@ -269,7 +268,7 @@ async def extract_tool_call(
 
     def _select():
         return client().chat.completions.create(
-            model=s.ollama_model,
+            model=get_active_model_name(),
             response_model=ToolSelection,
             temperature=0.1,
             max_retries=2,
@@ -298,7 +297,7 @@ async def extract_tool_call(
 
     def _extract():
         return client().chat.completions.create(
-            model=s.ollama_model,
+            model=get_active_model_name(),
             response_model=schema,
             temperature=0.1,
             max_retries=2,
@@ -470,6 +469,14 @@ async def execute_tool(call: HALToolCall) -> ToolResult:
             return _ok("python_exec", await execute_python(call.code))
         except Exception as e:
             return _err("python_exec", str(e))
+
+    # Web search ─────────────────────────────────────────────────────────────
+    if isinstance(call, WebSearch):
+        from app.tools.web_search import web_search
+        try:
+            return _ok("web_search", await web_search(call.query, call.max_results))
+        except Exception as e:
+            return _err("web_search", str(e))
 
     return _err(tool_name, f"Sin dispatcher para {tool_name}.")
 
