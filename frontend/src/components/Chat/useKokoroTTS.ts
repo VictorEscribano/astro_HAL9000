@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE_URL } from "../../api";
+import { useAppStore } from "../../store";
 
 /** Voice catalogue returned by `/api/voice/voices`.  Keyed by leading
  *  letter (`a` = American English, `e` = Spanish, `b` = British, …). */
@@ -39,11 +40,20 @@ interface AudioChunk {
 }
 
 export function useKokoroTTS(): KokoroTTSHandle {
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  // Voice prefs live in the Zustand store so they survive across hook
+  // mounts AND get hydrated from the active user's saved profile on app
+  // load.  We expose the *same shape* the old useState-based hook did so
+  // Chat.tsx's call sites don't have to change.
+  const voicePrefs = useAppStore((s) => s.voicePrefs);
+  const setVoicePrefs = useAppStore((s) => s.setVoicePrefs);
+  const voiceEnabled = voicePrefs.enabled;
+  const selectedVoice = voicePrefs.voice || null;
+  const setVoiceEnabled = useCallback((v: boolean) => setVoicePrefs({ enabled: v }), [setVoicePrefs]);
+  const setSelectedVoice = useCallback((v: string) => setVoicePrefs({ voice: v }), [setVoicePrefs]);
+
   const [available, setAvailable] = useState(false);
   const [voices, setVoices] = useState<string[]>([]);
   const [grouped, setGrouped] = useState<Record<string, string[]>>({});
-  const [selectedVoice, setSelectedVoice] = useState<string | null>(null);
   const [speaking, setSpeaking] = useState(false);
 
   // ── refs that survive renders without re-firing effects ───────────────────
@@ -78,11 +88,17 @@ export function useKokoroTTS(): KokoroTTSHandle {
         const list: string[] = v.voices ?? [];
         setVoices(list);
         setGrouped(v.grouped ?? {});
-        // Pick the user's language default if available.
-        const lang = (navigator.language || "en").toLowerCase();
-        const prefer = lang.startsWith("es") ? DEFAULT_VOICE_ES : DEFAULT_VOICE_EN;
-        if (list.includes(prefer)) setSelectedVoice(prefer);
-        else if (list.length > 0) setSelectedVoice(list[0]);
+        // Pick the user's language default ONLY if no voice has been set
+        // yet (fresh install / never-edited profile).  Saved preferences
+        // come in via applyProfile() in the store, which runs before this
+        // catalogue fetch most of the time.
+        const current = useAppStore.getState().voicePrefs.voice;
+        if (!current || !list.includes(current)) {
+          const lang = (navigator.language || "en").toLowerCase();
+          const prefer = lang.startsWith("es") ? DEFAULT_VOICE_ES : DEFAULT_VOICE_EN;
+          if (list.includes(prefer)) setSelectedVoice(prefer);
+          else if (list.length > 0) setSelectedVoice(list[0]);
+        }
       } catch {
         if (!cancelled) setAvailable(false);
       }
@@ -167,7 +183,7 @@ export function useKokoroTTS(): KokoroTTSHandle {
             text,
             voice: selectedVoice ?? undefined,
             lang,
-            speed: 0.9,
+            speed: voicePrefs.speed,
           }),
           signal: ac.signal,
         });
