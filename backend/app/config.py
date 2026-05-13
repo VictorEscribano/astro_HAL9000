@@ -31,6 +31,16 @@ class Settings(BaseSettings):
     # client requires *some* string, so we send "ik" by default.
     ik_llama_base_url: str = Field(default="http://localhost:8080", env="IK_LLAMA_BASE_URL")
     ik_llama_model: str = Field(default="ik", env="IK_LLAMA_MODEL")
+    # Enable Qwen3-style `<think>…</think>` reasoning blocks on every request.
+    # Default OFF because HAL's 4-calls-per-turn flow turns 200-300 thinking
+    # tokens/call into ~30-40 s of latency.  Flip to true to let the model
+    # reason out loud — useful for evaluating reasoning-tuned variants.
+    llm_thinking: bool = Field(default=False, env="LLM_THINKING")
+
+    # Web search — Tavily is preferred (cleaner LLM-tuned snippets, free
+    # 1000/mo) but optional; without it the web_search tool falls back to
+    # DuckDuckGo via the `ddgs` library (no key, lower quality, rate-limited).
+    tavily_api_key: str = Field(default="", env="TAVILY_API_KEY")
 
     use_voice: bool = Field(default=False, env="USE_VOICE")
 

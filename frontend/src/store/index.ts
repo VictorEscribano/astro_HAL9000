@@ -42,17 +42,31 @@ export interface MountStatus {
   log: string[];
 }
 
+export interface ChatPlan {
+  steps: string[];
+  rationale: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   toolCalls?: ToolCall[];
+  /** Accumulated `<think>…</think>` content from the response stream.  Rendered
+   *  in a separate collapsible card so the user can see the model's reasoning
+   *  without it polluting the answer body. */
+  thinking?: string;
+  /** Plan event emitted by the LangGraph planner before tool execution. */
+  plan?: ChatPlan;
 }
 
 export interface ToolCall {
   tool: string;
   input?: Record<string, unknown>;
-  output?: string;
+  /** Tool result.  Sent as JSON over SSE — may arrive deserialised as
+   *  object/array (most tools) or as a plain string (errors, weather, etc.).
+   *  Consumers must handle both.  ToolCallCard normalises before render. */
+  output?: unknown;
 }
 
 export interface SelectedTarget {
@@ -125,7 +139,7 @@ interface AppState {
 
   messages: ChatMessage[];
   addMessage: (m: ChatMessage) => void;
-  updateLastMessage: (content: string, toolCalls?: ToolCall[]) => void;
+  updateLastMessage: (patch: Partial<ChatMessage>) => void;
   clearMessages: () => void;
 
   ollamaOnline: boolean;
@@ -142,6 +156,26 @@ interface AppState {
 
   stelSelection: StelSelection | null;
   setStelSelection: (s: StelSelection | null) => void;
+
+  // ── Code Inspector ────────────────────────────────────────────────────────
+  /** Which tab is active in the ObjectView panel.  Lifted to the store so
+   *  external triggers (e.g. clicking "OPEN IN EDITOR" on a tool card) can
+   *  flip the tab from outside the ObjectView component. */
+  objectViewTab: "object" | "camera" | "code";
+  setObjectViewTab: (t: "object" | "camera" | "code") => void;
+
+  /** Current source in the Code Inspector.  When non-empty AND
+   *  `editorAttached` is true, every chat turn carries it as a system
+   *  context so the model can see "the code the user has open". */
+  editorCode: string;
+  editorLanguage: "python" | "text";
+  editorAttached: boolean;
+  setEditorCode: (c: string) => void;
+  setEditorAttached: (v: boolean) => void;
+  /** One-shot helper used by ToolCallCard: load code into the editor,
+   *  switch ObjectView to the Code tab, and mark it attached so the next
+   *  user message includes it as context. */
+  openCodeInEditor: (code: string) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -175,16 +209,12 @@ export const useAppStore = create<AppState>((set) => ({
   messages: [],
   addMessage: (m) => set((state) => ({ messages: [...state.messages, m] })),
   clearMessages: () => set({ messages: [] }),
-  updateLastMessage: (content, toolCalls) =>
+  updateLastMessage: (patch) =>
     set((state) => {
       const msgs = [...state.messages];
       const last = msgs[msgs.length - 1];
       if (last && last.role === "assistant") {
-        msgs[msgs.length - 1] = {
-          ...last,
-          content,
-          toolCalls: toolCalls ?? last.toolCalls,
-        };
+        msgs[msgs.length - 1] = { ...last, ...patch };
       }
       return { messages: msgs };
     }),
@@ -203,4 +233,19 @@ export const useAppStore = create<AppState>((set) => ({
 
   stelSelection: null,
   setStelSelection: (s) => set({ stelSelection: s }),
+
+  objectViewTab: "object",
+  setObjectViewTab: (t) => set({ objectViewTab: t }),
+
+  editorCode: "",
+  editorLanguage: "python",
+  editorAttached: false,
+  setEditorCode: (c) => set({ editorCode: c }),
+  setEditorAttached: (v) => set({ editorAttached: v }),
+  openCodeInEditor: (code) => set({
+    editorCode: code,
+    editorLanguage: "python",
+    editorAttached: true,
+    objectViewTab: "code",
+  }),
 }));

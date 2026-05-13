@@ -49,11 +49,13 @@ def _ik_llama_extra_body() -> dict:
     the backend is ik_llama.cpp.  Qwen3 (and other reasoning-capable Qwen
     variants) enable a `<think>…</think>` block by default — useful for
     one-shot QA but catastrophic for HAL: each turn issues 4 LLM calls
-    and 200-300 thinking tokens per call piles up to ~40 s of pure latency.
-    Forcing `enable_thinking=false` in the chat-template kwargs cuts that
-    out without sacrificing response quality for the kind of structured
-    extraction HAL does."""
-    return {"chat_template_kwargs": {"enable_thinking": False}}
+    and 200-300 thinking tokens per call piles up to ~30-40 s of latency.
+
+    Controlled by the `LLM_THINKING` env var (default off).  Setting it true
+    lets reasoning-tuned variants (e.g. Qwen3-Thinking, Qwen3.5-A3B with
+    thinking on) reason out loud — useful for evaluating quality, painful
+    for real-time chat."""
+    return {"chat_template_kwargs": {"enable_thinking": get_settings().llm_thinking}}
 
 
 @lru_cache

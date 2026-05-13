@@ -43,6 +43,7 @@ from app.agent.models import (
     ToolSelection,
     TrackingFeasibilityCheck,
     WeatherQuery,
+    WebSearch,
     tool_list_for_prompt,
 )
 from app.agent.prompts import INTENT_CLASSIFIER_PROMPT, TOOL_EXTRACTION_PROMPT
@@ -151,7 +152,20 @@ async def make_plan(user_message: str, history: list[dict] | None = None) -> Pla
                      "mapa terrestre) → `tracking_feasibility` (comprobar que "
                      "la velocidad angular cabe dentro de la velocidad máxima "
                      "del motor) → solo si es factible, `mount_goto` o "
-                     "`mount_track`.  NO uses `object_position` para satélites.\n\n"
+                     "`mount_track`.  NO uses `object_position` para satélites.\n"
+                     "- Si el usuario pide un cálculo, conversión de unidades, "
+                     "script, simulación, plot, transformación de datos, o "
+                     "cualquier 'hazme un programa que…' / 'calcula X' / "
+                     "'simula Y' → SIEMPRE incluye `python_exec` en el plan. "
+                     "NUNCA respondas con código sin ejecutarlo; el sandbox "
+                     "tiene numpy, astropy, skyfield y sgp4 pre-cargados. "
+                     "Si necesitas datos en vivo primero (posiciones, TLEs), "
+                     "ejecuta primero la herramienta correspondiente y luego "
+                     "`python_exec` para procesarlos.\n"
+                     "- Si el usuario pide información actual de la web "
+                     "(noticias recientes, biografías, perfiles, papers, "
+                     "reviews de equipo, cosas posteriores a tu entrenamiento) "
+                     "→ usa `web_search`. No inventes URLs ni datos.\n\n"
                      "Devuelve solo JSON."
                  )},
                 {"role": "user",
@@ -455,6 +469,14 @@ async def execute_tool(call: HALToolCall) -> ToolResult:
             return _ok("python_exec", await execute_python(call.code))
         except Exception as e:
             return _err("python_exec", str(e))
+
+    # Web search ─────────────────────────────────────────────────────────────
+    if isinstance(call, WebSearch):
+        from app.tools.web_search import web_search
+        try:
+            return _ok("web_search", await web_search(call.query, call.max_results))
+        except Exception as e:
+            return _err("web_search", str(e))
 
     return _err(tool_name, f"Sin dispatcher para {tool_name}.")
 

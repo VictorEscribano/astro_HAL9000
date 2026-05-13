@@ -82,6 +82,20 @@ BACKEND_PID=$!
 echo "  Backend PID: $BACKEND_PID (http://localhost:8000)"
 
 # ── Frontend ─────────────────────────────────────────────────────────────────
+# Bash spawned by us doesn't load the user's interactive .zshrc/.bashrc, so
+# nvm's `node`/`npm` aren't on PATH by default.  Source nvm explicitly (no-op
+# if not installed); fall back to scanning common install dirs if NVM_DIR
+# isn't set either.
+if ! command -v npm >/dev/null 2>&1; then
+    if [[ -s "${NVM_DIR:-$HOME/.nvm}/nvm.sh" ]]; then
+        # shellcheck disable=SC1091
+        . "${NVM_DIR:-$HOME/.nvm}/nvm.sh"
+    fi
+fi
+if ! command -v npm >/dev/null 2>&1; then
+    NPM_BIN="$(ls -t "$HOME"/.nvm/versions/node/*/bin/npm 2>/dev/null | head -1)"
+    [[ -n "$NPM_BIN" ]] && export PATH="$(dirname "$NPM_BIN"):$PATH"
+fi
 cd "$SCRIPT_DIR/frontend"
 npm run dev -- --host 0.0.0.0 &
 FRONTEND_PID=$!

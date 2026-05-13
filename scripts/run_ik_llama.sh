@@ -88,8 +88,22 @@ MOE_CPU_FROM="${MOE_CPU_FROM:-14}"
 # every reply.  Useful for one-shot reasoning, but *deadly* for HAL:
 # each turn issues 4 LLM calls (classify → plan → extract args → respond)
 # and 200-300 thinking tokens per call adds ~30-40 s of latency.  Disable
-# globally by default; set THINKING=1 to opt back in.
-THINKING="${THINKING:-0}"
+# globally by default.
+#
+# Single source of truth: the backend reads `LLM_THINKING` from .env on
+# every request (overriding whatever the server defaults to).  We mirror
+# that here so direct `curl` tests against :8080 see the same behaviour.
+# Explicit `THINKING=…` on the CLI wins.
+THINKING_DEFAULT=0
+if [[ -z "${THINKING:-}" && -f "$(dirname "$0")/../.env" ]]; then
+    val=$(grep -E '^[[:space:]]*LLM_THINKING[[:space:]]*=' \
+              "$(dirname "$0")/../.env" \
+          | tail -n1 | cut -d= -f2- | tr -d ' "'"'" | tr '[:upper:]' '[:lower:]')
+    case "$val" in
+        1|true|yes|on) THINKING_DEFAULT=1 ;;
+    esac
+fi
+THINKING="${THINKING:-$THINKING_DEFAULT}"
 
 echo "=== ik_llama.cpp llama-server ==="
 echo "  binary  : $SERVER_BIN"
