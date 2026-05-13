@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from pathlib import Path
 
 from app.services.cache import init_db
-from app.routers import sky, satellites, mount, chat, stel_proxy
+from app.routers import sky, satellites, mount, chat, stel_proxy, voice
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,6 +59,7 @@ app.include_router(sky.router)
 app.include_router(satellites.router)
 app.include_router(mount.router)
 app.include_router(chat.router)
+app.include_router(voice.router)
 app.include_router(stel_proxy.router)   # must be before SPA catch-all
 
 # Serve React frontend in production (MUST be last — catch-all)

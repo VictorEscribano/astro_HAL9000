@@ -5,55 +5,7 @@ import ToolCallCard from "./ToolCallCard";
 import ThinkingCard from "./ThinkingCard";
 import AssistantMarkdown from "./AssistantMarkdown";
 import PanelFrame from "../ui/PanelFrame";
-
-// ── Voice / TTS ────────────────────────────────────────────────────────────
-function useTTS() {
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [selectedVoice, setSelectedVoice] = useState<SpeechSynthesisVoice | null>(null);
-  const [speaking, setSpeaking] = useState(false);
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-
-  useEffect(() => {
-    function loadVoices() {
-      const all = speechSynthesis.getVoices();
-      // Prefer voices that sound natural: Google, Microsoft Neural, or language-matching
-      const filtered = all.filter((v) =>
-        v.name.toLowerCase().includes("google") ||
-        v.name.toLowerCase().includes("neural") ||
-        v.name.toLowerCase().includes("natural") ||
-        v.lang.startsWith("es") ||
-        v.lang.startsWith("en")
-      );
-      setVoices(filtered.length ? filtered : all.slice(0, 12));
-    }
-    loadVoices();
-    speechSynthesis.addEventListener("voiceschanged", loadVoices);
-    return () => speechSynthesis.removeEventListener("voiceschanged", loadVoices);
-  }, []);
-
-  const speak = useCallback((text: string) => {
-    if (!voiceEnabled || !text.trim()) return;
-    speechSynthesis.cancel();
-    const utt = new SpeechSynthesisUtterance(text);
-    if (selectedVoice) utt.voice = selectedVoice;
-    utt.rate = 1.05;
-    utt.pitch = 1.0;
-    utt.volume = 0.9;
-    utt.onstart = () => setSpeaking(true);
-    utt.onend = () => setSpeaking(false);
-    utt.onerror = () => setSpeaking(false);
-    utteranceRef.current = utt;
-    speechSynthesis.speak(utt);
-  }, [voiceEnabled, selectedVoice]);
-
-  const stop = useCallback(() => {
-    speechSynthesis.cancel();
-    setSpeaking(false);
-  }, []);
-
-  return { voiceEnabled, setVoiceEnabled, voices, selectedVoice, setSelectedVoice, speaking, speak, stop };
-}
+import { useKokoroTTS } from "./useKokoroTTS";
 
 // ── Waveform ───────────────────────────────────────────────────────────────
 function Waveform({ active }: { active: boolean }) {
@@ -78,38 +30,58 @@ function Waveform({ active }: { active: boolean }) {
 }
 
 // ── Voice selector popup ───────────────────────────────────────────────────
+// Kokoro v1 voice names: `<lang-prefix><gender>_<style>`.  We surface the
+// language groups Kokoro ships with so the user can find their tongue
+// quickly in a 50+ voice list.
+const KOKORO_LANG_LABEL: Record<string, string> = {
+  a: "American English",
+  b: "British English",
+  e: "Español",
+  f: "Français",
+  h: "हिन्दी",
+  i: "Italiano",
+  j: "日本語",
+  p: "Português",
+  z: "中文",
+};
+
 function VoiceSelector({
-  voices, selected, onSelect, onClose,
+  grouped, selected, onSelect, onClose,
 }: {
-  voices: SpeechSynthesisVoice[];
-  selected: SpeechSynthesisVoice | null;
-  onSelect: (v: SpeechSynthesisVoice) => void;
+  grouped: Record<string, string[]>;
+  selected: string | null;
+  onSelect: (v: string) => void;
   onClose: () => void;
 }) {
+  // Sort languages with Spanish + English first, others alphabetical.
+  const order = ["e", "a", "b", ...Object.keys(grouped).filter((k) => !"eab".includes(k)).sort()];
   return (
-    <div className="absolute bottom-full right-0 mb-1 w-64 bg-panel border border-white/[0.12]
+    <div className="absolute bottom-full right-0 mb-1 w-72 bg-panel border border-white/[0.12]
                     rounded shadow-2xl z-50 overflow-hidden">
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/[0.08]">
-        <span className="text-[calc(9px*var(--fs))] font-mono text-dim tracking-widest uppercase">Voice Catalog</span>
+        <span className="text-[calc(9px*var(--fs))] font-mono text-dim tracking-widest uppercase">Kokoro Voices</span>
         <button onClick={onClose} className="text-dim hover:text-text text-[calc(10px*var(--fs))]">✕</button>
       </div>
-      <div className="max-h-48 overflow-y-auto">
-        {voices.length === 0 && (
-          <div className="px-3 py-2 text-[calc(9px*var(--fs))] font-mono text-dim">No voices available</div>
-        )}
-        {voices.map((v, i) => (
-          <button
-            key={i}
-            onClick={() => { onSelect(v); onClose(); }}
-            className={`w-full text-left px-3 py-1.5 text-[calc(9px*var(--fs))] font-mono transition-colors
-              ${selected?.name === v.name
-                ? "bg-accent-red/20 text-accent-red"
-                : "text-text/70 hover:bg-white/[0.04] hover:text-text"
-              }`}
-          >
-            <span className="block truncate">{v.name}</span>
-            <span className="text-[calc(8px*var(--fs))] text-dim">{v.lang}</span>
-          </button>
+      <div className="max-h-64 overflow-y-auto">
+        {order.filter((g) => grouped[g]?.length).map((g) => (
+          <div key={g}>
+            <div className="px-3 py-1 text-[calc(7px*var(--fs))] font-mono text-dim/70 tracking-widest uppercase bg-white/[0.02]">
+              {KOKORO_LANG_LABEL[g] ?? g.toUpperCase()}
+            </div>
+            {grouped[g].map((v) => (
+              <button
+                key={v}
+                onClick={() => { onSelect(v); onClose(); }}
+                className={`w-full text-left px-3 py-1 text-[calc(9px*var(--fs))] font-mono transition-colors
+                  ${selected === v
+                    ? "bg-accent-red/20 text-accent-red"
+                    : "text-text/70 hover:bg-white/[0.04] hover:text-text"
+                  }`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
         ))}
       </div>
     </div>
@@ -133,7 +105,7 @@ export default function Chat() {
   // back down on every streamed token.
   const stickToBottomRef = useRef(true);
   const abortRef = useRef<AbortController | null>(null);
-  const tts = useTTS();
+  const tts = useKokoroTTS();
 
   // Detect user scroll → update sticky flag.  Threshold of 80px treats
   // "near the bottom" as still sticky to avoid flickering with small scrolls
@@ -360,9 +332,18 @@ export default function Chat() {
             <div className="relative flex items-center gap-1">
               <button
                 onClick={() => tts.setVoiceEnabled(!tts.voiceEnabled)}
-                title={tts.voiceEnabled ? "Voice ON — click to mute" : "Voice OFF — click to enable"}
+                disabled={!tts.available}
+                title={
+                  !tts.available
+                    ? "Kokoro TTS backend unavailable — model files missing on backend"
+                    : tts.voiceEnabled
+                    ? "Voice ON — click to mute"
+                    : "Voice OFF — click to enable"
+                }
                 className={`text-[calc(8px*var(--fs))] font-mono border px-2 py-0.5 rounded tracking-widest transition-colors
-                  ${tts.voiceEnabled
+                  ${!tts.available
+                    ? "text-dim/30 border-white/[0.04] cursor-not-allowed"
+                    : tts.voiceEnabled
                     ? "text-accent-red border-accent-red/40 bg-accent-red/10"
                     : "text-dim border-white/[0.08] hover:text-accent-red"
                   }`}
@@ -381,7 +362,7 @@ export default function Chat() {
               )}
               {showVoicePicker && (
                 <VoiceSelector
-                  voices={tts.voices}
+                  grouped={tts.grouped}
                   selected={tts.selectedVoice}
                   onSelect={tts.setSelectedVoice}
                   onClose={() => setShowVoicePicker(false)}

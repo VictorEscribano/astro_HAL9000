@@ -1,5 +1,7 @@
 const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
+export const API_BASE_URL = BASE;
+
 export async function fetchJson(path: string) {
   const res = await fetch(`${BASE}${path}`);
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
